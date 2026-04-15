@@ -7,7 +7,6 @@ import PublicGameView from './components/PublicGameView';
 import { LogOut, Shield, Trophy, Loader2 } from 'lucide-react';
 
 export default function App() {
-  // We add <any> or <string | null> to keep TypeScript happy
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
   const [view, setView] = useState<'match' | 'admin'>('match');
@@ -15,22 +14,22 @@ export default function App() {
   const [publicMatchId, setPublicMatchId] = useState<string | null>(null);
 
   useEffect(() => {
-    // 1. Check if the user is visiting a public match link
+    // 1. Check for public links
     const path = window.location.pathname;
     if (path.startsWith('/match/')) {
       const id = path.split('/match/')[1];
       setPublicMatchId(id);
     }
 
-    // 2. Check for an existing login session
+    // 2. Initial session check
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (session?.user) fetchProfile(session.user.id);
       else setLoading(false);
     });
 
-    // 3. Listen for login/logout changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChanged((_event, session) => {
+    // 3. LISTEN FOR AUTH CHANGES (FIXED: removed the 'd')
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
       if (session?.user) fetchProfile(session.user.id);
       else {
@@ -48,7 +47,6 @@ export default function App() {
     setLoading(false);
   };
 
-  // IF PUBLIC LINK: Show the live feed immediately
   if (publicMatchId) {
     return <PublicGameView gameId={publicMatchId} />;
   }
@@ -59,12 +57,10 @@ export default function App() {
     </div>
   );
 
-  // IF NOT LOGGED IN: Show login screen
   if (!user) return <Auth />;
 
   return (
     <div className="min-h-screen bg-black text-white">
-      {/* Navigation */}
       <nav className="glass-card m-4 p-4 flex justify-between items-center sticky top-4 z-50">
         <div className="flex items-center gap-6">
           <button 
@@ -92,12 +88,11 @@ export default function App() {
         </button>
       </nav>
 
-      {/* Main Content */}
       <main className="p-4 pb-20">
         {view === 'admin' && profile?.is_admin ? (
           <AdminView />
         ) : (
-          <MatchView user={user} profile={profile} onGoToAdmin={() => setView('admin')} />
+          <MatchView user={user} profile={profile} />
         )}
       </main>
     </div>
