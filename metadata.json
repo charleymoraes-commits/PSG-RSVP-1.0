@@ -1,0 +1,5 @@
+{
+  "name": "Perth Soccer Group",
+  "description": "A mobile-responsive web application for managing weekly soccer games, featuring a 22-player limit, waiting list, random team generator, and MVP voting system.",
+  "requestFramePermissions": []
+}
