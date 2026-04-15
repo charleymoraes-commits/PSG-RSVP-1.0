@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { supabase, isSupabaseConfigured } from './lib/supabase';
+import { supabase } from '../lib/supabase'; // FIXED: added ../
 import { motion, AnimatePresence } from 'motion/react';
 import { Mail, Lock, User, Loader2, ChevronRight, AlertCircle } from 'lucide-react';
 
@@ -18,14 +18,19 @@ export default function Auth() {
 
     try {
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: { data: { full_name: fullName } }
         });
         if (error) throw error;
-        alert('Account created! You can now log in.');
-        setIsSignUp(false);
+        
+        // If email confirmation is OFF, they log in immediately.
+        // If it's ON, we show this alert.
+        if (!data.session) {
+          alert('Account created! Please check your email to confirm.');
+          setIsSignUp(false);
+        }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -67,7 +72,7 @@ export default function Auth() {
                       type="text"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-white/40 transition-all"
+                      className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-white/40 transition-all text-white"
                       placeholder="John Doe"
                     />
                   </div>
@@ -84,7 +89,7 @@ export default function Auth() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-white/40 transition-all"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-white/40 transition-all text-white"
                   placeholder="name@example.com"
                 />
               </div>
@@ -99,7 +104,7 @@ export default function Auth() {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-white/40 transition-all"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 focus:outline-none focus:border-white/40 transition-all text-white"
                   placeholder="••••••••"
                 />
               </div>
