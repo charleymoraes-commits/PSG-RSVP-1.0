@@ -9,7 +9,7 @@ import AdminView from './components/AdminView';
 import PublicGameView from './components/PublicGameView';
 import { motion, AnimatePresence } from 'motion/react';
 import { Trophy, History, ShieldAlert, LogOut, Menu, X, AlertTriangle, ExternalLink, RefreshCw, Share2 } from 'lucide-react';
-import { cn } from './lib/utils';
+import { cn, formatTime } from './lib/utils';
 
 export default function App() {
   const [session, setSession] = useState<any>(null);
