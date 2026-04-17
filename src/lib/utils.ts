@@ -15,10 +15,14 @@ export function formatDate(date: string | Date) {
 
 export function formatTime(time: string) {
   if (!time) return '';
-  // Handle HH:MM:SS or HH:MM
   const parts = time.split(':');
   if (parts.length >= 2) {
-    return `${parts[0]}:${parts[1]}`;
+    let hours = parseInt(parts[0], 10);
+    const minutes = parts[1];
+    const ampm = hours >= 12 ? 'pm' : 'am';
+    hours = hours % 12;
+    hours = hours ? hours : 12; // the hour '0' should be '12'
+    return `${hours}:${minutes} ${ampm}`;
   }
   return time;
 }

@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { Game, Profile } from '../types';
 import { motion } from 'motion/react';
 import { Plus, Users, Shield, Trash2, Check, X, Copy, Flag, Share2, Trophy, Loader2 } from 'lucide-react';
-import { cn, formatTime } from '../lib/utils';
+import { cn, formatDate, formatTime } from '../lib/utils';
 
 export default function AdminView() {
   const [games, setGames] = useState<Game[]>([]);
@@ -72,10 +72,21 @@ export default function AdminView() {
     else fetchData();
   };
   
-  const copyPublicLink = (gameId: string) => {
-    const url = `${window.location.origin}/match/${gameId}`;
-    navigator.clipboard.writeText(url);
-    alert('Live Match link copied to clipboard!');
+  const copyPublicLink = (game: Game) => {
+    // Format: [Location] [Time] [Day] [DD/MM] [Live Link]
+    const [year, month, day] = game.date.split('-').map(Number);
+    const dateObj = new Date(year, month - 1, day);
+    
+    const dayName = dateObj.toLocaleDateString('en-AU', { weekday: 'long' });
+    const dd = String(dateObj.getDate()).padStart(2, '0');
+    const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+    
+    const cleanTime = formatTime(game.time).toLowerCase();
+    const url = `${window.location.origin}/match/${game.id}`;
+    const shareText = `${game.location} ${cleanTime} ${dayName} ${dd}/${mm} ${url}`;
+
+    navigator.clipboard.writeText(shareText);
+    alert('Share text copied to clipboard!\n\n' + shareText);
   };
 
   const toggleAdmin = async (profileId: string, currentStatus: boolean) => {
@@ -300,7 +311,7 @@ export default function AdminView() {
                 {game.status === 'open' && (
                   <>
                     <button 
-                      onClick={() => copyPublicLink(game.id)} 
+                      onClick={() => copyPublicLink(game)} 
                       className="bg-blue-500/10 text-blue-500 px-4 py-2 rounded-xl text-xs font-bold hover:bg-blue-500/20 transition-all flex items-center gap-2"
                     >
                       <Share2 size={14} /> Share Live List
