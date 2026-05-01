@@ -106,28 +106,35 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
 
     setActionLoading(true);
     try {
-      await fetchRSVPs();
-      const existingRSVP = rsvps.find(r => r.user_id === user.id);
+      // Fetch fresh data to avoid stale state issues
+      const { data: currentRSVPs, error: fetchError } = await supabase
+        .from('rsvps')
+        .select('*, profiles(*)')
+        .eq('game_id', nextGame.id)
+        .order('created_at', { ascending: true });
+
+      if (fetchError) throw fetchError;
+      
+      const latestRSVPs = currentRSVPs || [];
+      const existingRSVP = latestRSVPs.find(r => r.user_id === user.id);
       
       if (going) {
         // Handle "I'M IN"
-        if (existingRSVP && existingRSVP.status !== 'declined') {
+        if (existingRSVP && (existingRSVP.status === 'confirmed' || existingRSVP.status === 'waiting')) {
           setSuccess("You're already on it!");
           return;
         }
 
-        const confirmedCount = rsvps.filter(r => r.status === 'confirmed').length;
+        const confirmedCount = latestRSVPs.filter(r => r.status === 'confirmed').length;
         const newStatus = confirmedCount < 22 ? 'confirmed' : 'waiting';
 
         if (existingRSVP) {
-          // Update existing (from declined to in)
           const { error: updateError } = await supabase
             .from('rsvps')
             .update({ status: newStatus, created_at: new Date().toISOString() })
             .eq('id', existingRSVP.id);
           if (updateError) throw updateError;
         } else {
-          // Create new
           const { error: insertError } = await supabase.from('rsvps').insert({
             game_id: nextGame.id,
             user_id: user.id,
@@ -145,32 +152,35 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
 
         const wasConfirmed = existingRSVP?.status === 'confirmed';
 
-        if (existingRSVP) {
-          // Update to declined
-          const { error: updateError } = await supabase
-            .from('rsvps')
-            .update({ status: 'declined' })
-            .eq('id', existingRSVP.id);
-          if (updateError) throw updateError;
+        // Try to update to 'declined'. If this fails due to DB constraint, fallback to delete.
+        const { error: updateError } = await (existingRSVP 
+          ? supabase.from('rsvps').update({ status: 'declined' }).eq('id', existingRSVP.id)
+          : supabase.from('rsvps').insert({ game_id: nextGame.id, user_id: user.id, status: 'declined' }));
+
+        if (updateError) {
+          if (updateError.message.includes('violates check constraint') || updateError.message.includes('check constraint "rsvps_status_check"')) {
+            // Fallback: If 'declined' isn't supported, just delete the entry (old behavior)
+            if (existingRSVP) {
+              const { error: deleteError } = await supabase.from('rsvps').delete().eq('id', existingRSVP.id);
+              if (deleteError) throw deleteError;
+              setSuccess('Successfully withdrawn.');
+            } else {
+              setSuccess('Already out.');
+            }
+          } else {
+            throw updateError;
+          }
         } else {
-          // Create as declined
-          const { error: insertError } = await supabase.from('rsvps').insert({
-            game_id: nextGame.id,
-            user_id: user.id,
-            status: 'declined'
-          });
-          if (insertError) throw insertError;
+          setSuccess('Successfully recorded: OUT.');
         }
 
         // Manual Promotion: If a confirmed player withdraws, promote the first waiting player
         if (wasConfirmed && nextGame.status === 'open') {
-          const firstWaiting = rsvps.find(r => r.status === 'waiting');
+          const firstWaiting = latestRSVPs.find(r => r.status === 'waiting');
           if (firstWaiting) {
             await supabase.from('rsvps').update({ status: 'confirmed' }).eq('id', firstWaiting.id);
           }
         }
-        
-        setSuccess('Successfully recorded: OUT.');
       }
       
       await fetchRSVPs();
