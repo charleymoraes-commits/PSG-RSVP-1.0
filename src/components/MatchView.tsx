@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Game, RSVP, Profile, Vote as VoteType } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Users, MapPin, Clock, Trophy, Shuffle, CheckCircle2, AlertCircle, ShieldAlert, Loader2, Vote as VoteIcon, Check, RotateCw } from 'lucide-react';
+import { Users, MapPin, Clock, Trophy, Shuffle, CheckCircle2, AlertCircle, ShieldAlert, Loader2, Vote as VoteIcon, Check, RotateCw, X } from 'lucide-react';
 import { cn, formatDate, formatTime } from '../lib/utils';
 
 interface MatchViewProps {
@@ -89,7 +89,7 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
     if (data) setVotes(data);
   };
 
-  const handleRSVP = async () => {
+  const handleRSVP = async (going: boolean) => {
     setError(null);
     setSuccess(null);
 
@@ -109,12 +109,60 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
       await fetchRSVPs();
       const existingRSVP = rsvps.find(r => r.user_id === user.id);
       
-      if (existingRSVP) {
-        const wasConfirmed = existingRSVP.status === 'confirmed';
-        const { error: deleteError } = await supabase.from('rsvps').delete().eq('id', existingRSVP.id);
-        if (deleteError) throw deleteError;
+      if (going) {
+        // Handle "I'M IN"
+        if (existingRSVP && existingRSVP.status !== 'declined') {
+          setSuccess("You're already on it!");
+          return;
+        }
 
-        // Automatic Promotion: If a confirmed player withdraws, promote the first waiting player
+        const confirmedCount = rsvps.filter(r => r.status === 'confirmed').length;
+        const newStatus = confirmedCount < 22 ? 'confirmed' : 'waiting';
+
+        if (existingRSVP) {
+          // Update existing (from declined to in)
+          const { error: updateError } = await supabase
+            .from('rsvps')
+            .update({ status: newStatus, created_at: new Date().toISOString() })
+            .eq('id', existingRSVP.id);
+          if (updateError) throw updateError;
+        } else {
+          // Create new
+          const { error: insertError } = await supabase.from('rsvps').insert({
+            game_id: nextGame.id,
+            user_id: user.id,
+            status: newStatus
+          });
+          if (insertError) throw insertError;
+        }
+        setSuccess(newStatus === 'confirmed' ? "You're on it!" : 'Added to waiting list.');
+      } else {
+        // Handle "I'M OUT"
+        if (existingRSVP && existingRSVP.status === 'declined') {
+          setSuccess("You've already declined.");
+          return;
+        }
+
+        const wasConfirmed = existingRSVP?.status === 'confirmed';
+
+        if (existingRSVP) {
+          // Update to declined
+          const { error: updateError } = await supabase
+            .from('rsvps')
+            .update({ status: 'declined' })
+            .eq('id', existingRSVP.id);
+          if (updateError) throw updateError;
+        } else {
+          // Create as declined
+          const { error: insertError } = await supabase.from('rsvps').insert({
+            game_id: nextGame.id,
+            user_id: user.id,
+            status: 'declined'
+          });
+          if (insertError) throw insertError;
+        }
+
+        // Manual Promotion: If a confirmed player withdraws, promote the first waiting player
         if (wasConfirmed && nextGame.status === 'open') {
           const firstWaiting = rsvps.find(r => r.status === 'waiting');
           if (firstWaiting) {
@@ -122,18 +170,7 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
           }
         }
         
-        setSuccess('Successfully withdrawn.');
-      } else {
-        const confirmedCount = rsvps.filter(r => r.status === 'confirmed').length;
-        const status = confirmedCount < 22 ? 'confirmed' : 'waiting';
-        
-        const { error: insertError } = await supabase.from('rsvps').insert({
-          game_id: nextGame.id,
-          user_id: user.id,
-          status
-        });
-        if (insertError) throw insertError;
-        setSuccess(status === 'confirmed' ? 'You are IN!' : 'Added to waiting list.');
+        setSuccess('Successfully recorded: OUT.');
       }
       
       await fetchRSVPs();
@@ -200,7 +237,10 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
 
   const confirmed = rsvps.filter(r => r.status === 'confirmed');
   const waiting = rsvps.filter(r => r.status === 'waiting');
+  const declined = rsvps.filter(r => r.status === 'declined');
   const myRSVP = rsvps.find(r => r.user_id === user?.id);
+  const isIn = myRSVP && (myRSVP.status === 'confirmed' || myRSVP.status === 'waiting');
+  const isOut = myRSVP && myRSVP.status === 'declined';
   const myVote = votes.find(v => v.voter_id === user?.id);
 
   const getVoteCount = (playerId: string) => {
@@ -245,25 +285,44 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
             </div>
           </div>
 
-          <div className="flex flex-col items-center gap-3">
+          <div className="flex flex-col md:flex-row items-center gap-4">
             <button
-              onClick={handleRSVP}
+              onClick={() => handleRSVP(true)}
               disabled={actionLoading || nextGame.status !== 'open'}
               className={cn(
-                "px-10 py-5 rounded-2xl font-black text-xl transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 min-w-[200px]",
-                myRSVP 
-                  ? "bg-white/10 text-white hover:bg-white/20 border border-white/20" 
+                "px-10 py-5 rounded-2xl font-black text-xl transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 min-w-[240px]",
+                isIn 
+                  ? "bg-[#00ff66]/20 text-[#00ff66] border-2 border-[#00ff66]" 
+                  : "bg-[#00ff66] text-black hover:bg-[#00cc55] shadow-[0_0_20px_rgba(0,255,102,0.3)]"
+              )}
+            >
+              {actionLoading ? (
+                <Loader2 className="animate-spin" size={24} />
+              ) : (
+                isIn ? "YOU'RE ON IT!" : "I'M IN!"
+              )}
+            </button>
+
+            <button
+              onClick={() => handleRSVP(false)}
+              disabled={actionLoading || nextGame.status !== 'open'}
+              className={cn(
+                "px-10 py-5 rounded-2xl font-black text-xl transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 min-w-[240px]",
+                isOut 
+                  ? "bg-highlight/20 text-highlight border-2 border-highlight" 
                   : "bg-highlight text-white hover:bg-red-600 shadow-[0_0_20px_rgba(255,59,48,0.3)]"
               )}
             >
               {actionLoading ? (
                 <Loader2 className="animate-spin" size={24} />
               ) : (
-                myRSVP ? "I'm Out" : "I'm In!"
+                isOut ? "DECLINED" : "I'M OUT"
               )}
             </button>
-            {error && <p className="text-highlight text-xs font-bold bg-highlight/10 px-3 py-1 rounded border border-highlight/20">{error}</p>}
-            {success && <p className="text-white text-xs font-bold bg-white/10 px-3 py-1 rounded border border-white/20">{success}</p>}
+          </div>
+          <div className="mt-4 text-center">
+            {error && <p className="text-highlight text-xs font-bold bg-highlight/10 px-3 py-1 rounded border border-highlight/20 inline-block">{error}</p>}
+            {success && <p className="text-[#00ff66] text-xs font-bold bg-[#00ff66]/10 px-3 py-1 rounded border border-[#00ff66]/20 inline-block">{success}</p>}
           </div>
         </div>
       </motion.div>
@@ -367,14 +426,14 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
       )}
 
       {/* Player Lists */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         <div className="space-y-4">
           <h3 className="text-xl font-black italic flex items-center gap-2 text-white">
-            <CheckCircle2 className="text-white" /> CONFIRMED ({confirmed.length}/22)
+            <CheckCircle2 className="text-[#00ff66]" /> CONFIRMED ({confirmed.length}/22)
           </h3>
           <div className="space-y-2">
             {confirmed.map((rsvp, i) => (
-              <div key={rsvp.id} className="glass-card p-4 flex items-center justify-between">
+              <div key={rsvp.id} className="glass-card p-4 flex items-center justify-between border-l-4 border-[#00ff66]">
                 <div className="flex items-center gap-4">
                   <span className="text-white/20 font-black italic w-6">{i + 1}</span>
                   <span className="font-bold">{rsvp.profiles?.full_name}</span>
@@ -383,13 +442,30 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
             ))}
           </div>
         </div>
+        
         <div className="space-y-4">
           <h3 className="text-xl font-black italic flex items-center gap-2">
-            <Shuffle className="text-white/20" /> WAITING LIST ({waiting.length})
+            <Shuffle className="text-yellow-500" /> WAITING ({waiting.length})
           </h3>
           <div className="space-y-2">
             {waiting.map((rsvp, i) => (
-              <div key={rsvp.id} className="glass-card p-4 flex items-center justify-between opacity-60">
+              <div key={rsvp.id} className="glass-card p-4 flex items-center justify-between opacity-60 border-l-4 border-yellow-500">
+                <div className="flex items-center gap-4">
+                  <span className="text-white/20 font-black italic w-6">{i + 1}</span>
+                  <span className="font-bold">{rsvp.profiles?.full_name}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <h3 className="text-xl font-black italic flex items-center gap-2 text-white/40">
+            <X className="text-highlight" /> OUT ({declined.length})
+          </h3>
+          <div className="space-y-2">
+            {declined.map((rsvp, i) => (
+              <div key={rsvp.id} className="glass-card p-4 flex items-center justify-between opacity-40 border-l-4 border-highlight">
                 <div className="flex items-center gap-4">
                   <span className="text-white/20 font-black italic w-6">{i + 1}</span>
                   <span className="font-bold">{rsvp.profiles?.full_name}</span>

@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS rsvps (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   game_id UUID REFERENCES games(id) ON DELETE CASCADE NOT NULL,
   user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
-  status TEXT CHECK (status IN ('confirmed', 'waiting')) NOT NULL,
+  status TEXT CHECK (status IN ('confirmed', 'waiting', 'declined')) NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
   UNIQUE(game_id, user_id)
 );
@@ -44,12 +44,15 @@ CREATE TABLE IF NOT EXISTS votes (
 );
 
 -- 5. Auto-Promotion Trigger
-CREATE OR REPLACE FUNCTION handle_rsvp_deletion()
+CREATE OR REPLACE FUNCTION handle_rsvp_change()
 RETURNS TRIGGER AS $$
 DECLARE
   next_waiting_id UUID;
 BEGIN
-  IF OLD.status = 'confirmed' THEN
+  -- Fire if a confirmed player is deleted OR moves to 'declined'
+  IF (TG_OP = 'DELETE' AND OLD.status = 'confirmed') OR 
+     (TG_OP = 'UPDATE' AND OLD.status = 'confirmed' AND NEW.status = 'declined') THEN
+    
     SELECT id INTO next_waiting_id
     FROM rsvps
     WHERE game_id = OLD.game_id AND status = 'waiting'
@@ -62,14 +65,14 @@ BEGIN
       WHERE id = next_waiting_id;
     END IF;
   END IF;
-  RETURN OLD;
+  RETURN COALESCE(NEW, OLD);
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS on_rsvp_deleted ON rsvps;
-CREATE TRIGGER on_rsvp_deleted
-AFTER DELETE ON rsvps
-FOR EACH ROW EXECUTE FUNCTION handle_rsvp_deletion();
+DROP TRIGGER IF EXISTS on_rsvp_change ON rsvps;
+CREATE TRIGGER on_rsvp_change
+AFTER DELETE OR UPDATE ON rsvps
+FOR EACH ROW EXECUTE FUNCTION handle_rsvp_change();
 
 -- 6. RLS Policies
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;

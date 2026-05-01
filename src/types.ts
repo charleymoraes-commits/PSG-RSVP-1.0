@@ -23,7 +23,7 @@ export interface RSVP {
   id: string;
   game_id: string;
   user_id: string;
-  status: 'confirmed' | 'waiting';
+  status: 'confirmed' | 'waiting' | 'declined';
   created_at: string;
   profiles?: Profile;
 }

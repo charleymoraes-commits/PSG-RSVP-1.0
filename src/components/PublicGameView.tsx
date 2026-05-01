@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Game, RSVP, Profile } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { MapPin, Clock, Trophy, CheckCircle2, Shuffle, Loader2, BarChart3, Users, ExternalLink, Check, RotateCw } from 'lucide-react';
+import { MapPin, Clock, Trophy, CheckCircle2, Shuffle, Loader2, BarChart3, Users, ExternalLink, Check, RotateCw, X } from 'lucide-react';
 import { cn, formatTime, formatDate } from '../lib/utils';
 
 interface PublicGameViewProps {
@@ -165,6 +165,7 @@ export default function PublicGameView({ gameId }: PublicGameViewProps) {
 
   const confirmed = rsvps.filter(r => r.status === 'confirmed');
   const waiting = rsvps.filter(r => r.status === 'waiting');
+  const declined = rsvps.filter(r => r.status === 'declined');
   const myVote = votes.find(v => v.voter_id === currentUser?.id);
 
   const getVoteCount = (playerId: string) => votes.filter(v => v.candidate_id === playerId).length;
@@ -396,6 +397,24 @@ export default function PublicGameView({ gameId }: PublicGameViewProps) {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {waiting.map((rsvp, i) => (
                       <div key={rsvp.id} className="bg-white/5 p-4 rounded-xl flex items-center justify-between border border-white/5 opacity-40">
+                        <div className="flex items-center gap-4">
+                          <span className="text-white/20 font-black italic w-6">{i + 1}</span>
+                          <span className="font-bold tracking-tight">{rsvp.profiles?.full_name || 'Unknown Player'}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {declined.length > 0 && (
+                <div className="space-y-6 pt-12 border-t border-white/5">
+                  <h3 className="text-2xl font-black italic tracking-tighter flex items-center gap-3 text-highlight/40">
+                    <X size={24} /> DECLINED (OUT)
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {declined.map((rsvp, i) => (
+                      <div key={rsvp.id} className="bg-white/5 p-4 rounded-xl flex items-center justify-between border border-highlight/10 opacity-30">
                         <div className="flex items-center gap-4">
                           <span className="text-white/20 font-black italic w-6">{i + 1}</span>
                           <span className="font-bold tracking-tight">{rsvp.profiles?.full_name || 'Unknown Player'}</span>
