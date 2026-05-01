@@ -275,7 +275,7 @@ export default function AdminView() {
                 title="Copy Previous Game"
                 className="bg-white/10 p-2 rounded-lg hover:bg-white/20 transition-all"
               >
-                <Copy size={20} />
+                <Copy size={20} className="text-white" />
               </button>
             </div>
           </div>
