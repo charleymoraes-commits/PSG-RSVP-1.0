@@ -25,7 +25,6 @@ export default function HistoryView({ user }: HistoryViewProps) {
     const { data, error } = await supabase
       .from('games')
       .select('*')
-      .eq('status', 'finished')
       .order('date', { ascending: false });
 
     if (error) console.error('Error fetching history:', error);
@@ -88,9 +87,26 @@ export default function HistoryView({ user }: HistoryViewProps) {
           >
             <div className="flex flex-col md:flex-row justify-between gap-6">
               <div className="space-y-4">
-                <div className="flex items-center gap-3 text-white/60">
-                  <Calendar size={18} />
-                  <span>{formatDate(game.date)}</span>
+                <div className="flex flex-wrap items-center gap-3 text-white/60">
+                  <div className="flex items-center gap-2">
+                    <Calendar size={18} />
+                    <span>{formatDate(game.date)}</span>
+                  </div>
+                  {game.status === 'open' && (
+                    <span className="text-[10px] bg-[#00ff66]/10 text-[#00ff66] border border-[#00ff66]/20 px-2.5 py-0.5 rounded-full font-black uppercase tracking-wider">
+                      RSVP Open
+                    </span>
+                  )}
+                  {game.status === 'closed' && (
+                    <span className="text-[10px] bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 px-2.5 py-0.5 rounded-full font-black uppercase tracking-wider">
+                      RSVP Closed
+                    </span>
+                  )}
+                  {game.status === 'voting' && (
+                    <span className="text-[10px] bg-blue-500/15 text-blue-400 border border-blue-500/20 px-2.5 py-0.5 rounded-full font-black uppercase tracking-wider animate-pulse">
+                      Voting Active
+                    </span>
+                  )}
                 </div>
                 <a 
                   href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${game.location}, Perth WA`)}`}
@@ -111,14 +127,29 @@ export default function HistoryView({ user }: HistoryViewProps) {
               </div>
 
               <div className="flex items-center">
-                {myVotes[game.id] ? (
+                {game.status === 'open' || game.status === 'closed' ? (
+                  <button
+                    disabled
+                    className="bg-white/5 text-white/20 border border-white/5 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-not-allowed"
+                    title="Voting will open after the match is played"
+                  >
+                    Vote for MVP (Locked)
+                  </button>
+                ) : myVotes[game.id] ? (
                   <div className="bg-white/5 px-4 py-2 rounded-lg text-white/40 text-sm flex items-center gap-2">
                     <Award size={16} /> Voted
+                  </div>
+                ) : game.status === 'finished' ? (
+                  <div 
+                    className="bg-white/5 text-white/20 border border-white/5 px-5 py-2.5 rounded-xl text-xs font-bold cursor-not-allowed"
+                    title="Voting is closed for this match"
+                  >
+                    Voting Closed
                   </div>
                 ) : (
                   <button
                     onClick={() => startVoting(game)}
-                    className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-6 py-3 rounded-xl font-bold transition-all"
+                    className="bg-pitch text-black px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-pitch-dark transition-all shadow-[0_0_15px_rgba(0,255,102,0.2)]"
                   >
                     Vote for MVP
                   </button>

@@ -27,6 +27,7 @@ export default function PublicGameView({ gameId }: PublicGameViewProps) {
   const [currentUserProfile, setCurrentUserProfile] = useState<Profile | null>(null);
   const [rsvpMessage, setRsvpMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [showConfirmCancel, setShowConfirmCancel] = useState(false);
 
   const fetchRSVPs = async () => {
     const { data, error } = await supabase
@@ -546,18 +547,49 @@ const confirmed = rsvps.filter(r => r.status === 'confirmed');
                             {actionLoading ? <Loader2 className="animate-spin w-4 h-4" /> : "I'm IN ⚽"}
                           </button>
                           
-                          <button
-                            onClick={() => handleRSVPAction(false)}
-                            disabled={actionLoading}
-                            className={cn(
-                              "text-xs font-black uppercase tracking-wider px-6 py-3 rounded-xl transition-all flex items-center gap-2",
-                              isDeclined
-                                ? "bg-red-500 text-white font-extrabold cursor-default pointer-events-none"
-                                : "bg-white/5 border border-white/10 text-white hover:border-red-500 hover:text-red-500 cursor-pointer"
-                            )}
-                          >
-                            {actionLoading ? <Loader2 className="animate-spin w-4 h-4" /> : "I'm OUT ❌"}
-                          </button>
+                          {showConfirmCancel ? (
+                            <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 p-1.5 rounded-xl">
+                              <span className="text-[10px] text-red-400 font-bold px-1 uppercase tracking-tight">Are you sure?</span>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  setShowConfirmCancel(false);
+                                  await handleRSVPAction(false);
+                                }}
+                                disabled={actionLoading}
+                                className="bg-red-500 text-white text-[10px] font-black uppercase px-2.5 py-1.5 rounded-lg hover:bg-red-600 transition-all cursor-pointer"
+                              >
+                                CONFIRM OUT ❌
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setShowConfirmCancel(false)}
+                                className="bg-white/10 text-white text-[10px] font-black uppercase px-2.5 py-1.5 rounded-lg hover:bg-white/20 transition-all cursor-pointer"
+                              >
+                                Keep Spot ⚽
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                const myRSVP = rsvps.find(r => r.user_id === currentUser.id);
+                                if (myRSVP && (myRSVP.status === 'confirmed' || myRSVP.status === 'waiting')) {
+                                  setShowConfirmCancel(true);
+                                } else {
+                                  handleRSVPAction(false);
+                                }
+                              }}
+                              disabled={actionLoading}
+                              className={cn(
+                                "text-xs font-black uppercase tracking-wider px-6 py-3 rounded-xl transition-all flex items-center gap-2",
+                                isDeclined
+                                  ? "bg-red-500 text-white font-extrabold cursor-default pointer-events-none"
+                                  : "bg-white/5 border border-white/10 text-white hover:border-red-500 hover:text-red-500 cursor-pointer"
+                              )}
+                            >
+                              {actionLoading ? <Loader2 className="animate-spin w-4 h-4" /> : "I'm OUT ❌"}
+                            </button>
+                          )}
                         </>
                       );
                     })()}

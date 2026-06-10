@@ -20,6 +20,7 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [showConfirmCancel, setShowConfirmCancel] = useState(false);
 
   useEffect(() => {
     fetchNextGame();
@@ -378,41 +379,73 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
             </div>
           </div>
 
-          <div className="flex flex-col md:flex-row items-center gap-4">
-            <button
-              onClick={() => handleRSVP(true)}
-              disabled={actionLoading || nextGame.status !== 'open'}
-              className={cn(
-                "px-10 py-5 rounded-2xl font-black text-xl transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 min-w-[240px]",
-                isIn 
-                  ? "bg-[#00ff66]/20 text-[#00ff66] border-2 border-[#00ff66]" 
-                  : "bg-[#00ff66] text-black hover:bg-[#00cc55] shadow-[0_0_20px_rgba(0,255,102,0.3)]"
-              )}
-            >
-              {actionLoading ? (
-                <Loader2 className="animate-spin" size={24} />
-              ) : (
-                isIn ? "YOU'RE ON IT!" : "I'M IN!"
-              )}
-            </button>
+          {showConfirmCancel ? (
+            <div className="bg-highlight/10 border border-highlight/20 p-5 rounded-2xl w-full max-w-md space-y-4 animate-in fade-in-50 duration-200 text-center">
+              <p className="text-white text-md font-black uppercase tracking-tight">Are you sure you want to cancel your RSVP?</p>
+              <div className="flex gap-3 justify-center">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setShowConfirmCancel(false);
+                    await handleRSVP(false);
+                  }}
+                  disabled={actionLoading}
+                  className="flex-1 bg-highlight text-white py-3.5 rounded-xl text-xs font-black tracking-wider uppercase hover:bg-red-600 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {actionLoading ? <Loader2 className="animate-spin" size={16} /> : "Yes, OUT ❌"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmCancel(false)}
+                  className="flex-1 bg-white/10 text-white py-3.5 rounded-xl text-xs font-black tracking-wider uppercase hover:bg-white/20 active:scale-95 transition-all cursor-pointer"
+                >
+                  Keep Spot ⚽
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col md:flex-row items-center gap-4">
+              <button
+                onClick={() => handleRSVP(true)}
+                disabled={actionLoading || nextGame.status !== 'open'}
+                className={cn(
+                  "px-10 py-5 rounded-2xl font-black text-xl transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 min-w-[240px]",
+                  isIn 
+                    ? "bg-[#00ff66]/20 text-[#00ff66] border-2 border-[#00ff66]" 
+                    : "bg-[#00ff66] text-black hover:bg-[#00cc55] shadow-[0_0_20px_rgba(0,255,102,0.3)]"
+                )}
+              >
+                {actionLoading ? (
+                  <Loader2 className="animate-spin" size={24} />
+                ) : (
+                  isIn ? "YOU'RE ON IT!" : "I'M IN!"
+                )}
+              </button>
 
-            <button
-              onClick={() => handleRSVP(false)}
-              disabled={actionLoading || nextGame.status !== 'open'}
-              className={cn(
-                "px-10 py-5 rounded-2xl font-black text-xl transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 min-w-[240px]",
-                isOut 
-                  ? "bg-highlight/20 text-highlight border-2 border-highlight" 
-                  : "bg-highlight text-white hover:bg-red-600 shadow-[0_0_20px_rgba(255,59,48,0.3)]"
-              )}
-            >
-              {actionLoading ? (
-                <Loader2 className="animate-spin" size={24} />
-              ) : (
-                isOut ? "DECLINED" : "I'M OUT"
-              )}
-            </button>
-          </div>
+              <button
+                onClick={() => {
+                  if (isIn) {
+                    setShowConfirmCancel(true);
+                  } else {
+                    handleRSVP(false);
+                  }
+                }}
+                disabled={actionLoading || nextGame.status !== 'open'}
+                className={cn(
+                  "px-10 py-5 rounded-2xl font-black text-xl transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 min-w-[240px]",
+                  isOut 
+                    ? "bg-highlight/20 text-highlight border-2 border-highlight" 
+                    : "bg-highlight text-white hover:bg-red-600 shadow-[0_0_20px_rgba(255,59,48,0.3)]"
+                )}
+              >
+                {actionLoading ? (
+                  <Loader2 className="animate-spin" size={24} />
+                ) : (
+                  isOut ? "DECLINED" : "I'M OUT"
+                )}
+              </button>
+            </div>
+          )}
           <div className="mt-4 text-center">
             {error && <p className="text-highlight text-xs font-bold bg-highlight/10 px-3 py-1 rounded border border-highlight/20 inline-block">{error}</p>}
             {success && <p className="text-[#00ff66] text-xs font-bold bg-[#00ff66]/10 px-3 py-1 rounded border border-[#00ff66]/20 inline-block">{success}</p>}
