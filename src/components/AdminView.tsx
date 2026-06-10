@@ -12,6 +12,7 @@ export default function AdminView() {
   const [newGameDate, setNewGameDate] = useState('');
   const [newGameTime, setNewGameTime] = useState('18:45');
   const [newGameLocation, setNewGameLocation] = useState('Rivervale');
+  const [hasInitializedForm, setHasInitializedForm] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -25,6 +26,20 @@ export default function AdminView() {
 
   const [approvingId, setApprovingId] = useState<string | null>(null);
 
+  const getNextWeekDateString = (dateStr: string): string => {
+    try {
+      const [year, month, day] = dateStr.split('-').map(Number);
+      const date = new Date(year, month - 1, day);
+      date.setDate(date.getDate() + 7);
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    } catch (e) {
+      return '';
+    }
+  };
+
   const fetchData = async () => {
     setLoading(true);
     const [gamesRes, profilesRes] = await Promise.all([
@@ -32,7 +47,33 @@ export default function AdminView() {
       supabase.from('profiles').select('*').order('full_name', { ascending: true })
     ]);
 
-    if (gamesRes.data) setGames(gamesRes.data);
+    if (gamesRes.data) {
+      setGames(gamesRes.data);
+      
+      // Auto-prefill the creation form on initial load
+      if (!hasInitializedForm) {
+        if (gamesRes.data.length > 0) {
+          const lastGame = gamesRes.data[0];
+          setNewGameLocation(lastGame.location);
+          setNewGameTime(lastGame.time);
+          const nextDate = getNextWeekDateString(lastGame.date);
+          if (nextDate) {
+            setNewGameDate(nextDate);
+          }
+        } else {
+          // Defaults if no games exist
+          setNewGameLocation('Rivervale (Copley Park)');
+          setNewGameTime('18:45');
+          const today = new Date();
+          const y = today.getFullYear();
+          const m = String(today.getMonth() + 1).padStart(2, '0');
+          const d = String(today.getDate()).padStart(2, '0');
+          setNewGameDate(`${y}-${m}-${d}`);
+        }
+        setHasInitializedForm(true);
+      }
+    }
+    
     if (profilesRes.data) {
       setProfiles(profilesRes.data);
     }
@@ -249,47 +290,66 @@ export default function AdminView() {
             </div>
           </div>
         ) : (
-          <div className="glass-card p-6 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-            <div className="space-y-1">
-              <label className="text-xs text-white/40 uppercase font-bold">Date</label>
-              <input 
-                type="date" 
-                value={newGameDate}
-                onChange={e => setNewGameDate(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-lg p-2 focus:border-pitch outline-none" 
-              />
+          <div className="glass-card p-6 flex flex-col gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+              <div className="space-y-1">
+                <label className="text-xs text-white/40 uppercase font-bold">Date</label>
+                <input 
+                  type="date" 
+                  value={newGameDate}
+                  onChange={e => setNewGameDate(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg p-2 focus:border-pitch outline-none" 
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-white/40 uppercase font-bold">Time</label>
+                <input 
+                  type="time" 
+                  value={newGameTime}
+                  onChange={e => setNewGameTime(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg p-2 focus:border-pitch outline-none" 
+                />
+              </div>
+              <div className="space-y-1 md:col-span-2">
+                <label className="text-xs text-white/40 uppercase font-bold">Location</label>
+                <input 
+                  type="text" 
+                  value={newGameLocation}
+                  onChange={e => setNewGameLocation(e.target.value)}
+                  placeholder="e.g. Rivervale (Copley Park)"
+                  className="w-full bg-white/5 border border-white/10 rounded-lg p-2 focus:border-pitch outline-none" 
+                />
+              </div>
             </div>
-            <div className="space-y-1">
-              <label className="text-xs text-white/40 uppercase font-bold">Time</label>
-              <input 
-                type="time" 
-                value={newGameTime}
-                onChange={e => setNewGameTime(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-lg p-2 focus:border-pitch outline-none" 
-              />
+
+            {/* Quick Presets Selection Buttons */}
+            <div className="border-t border-white/5 pt-4 space-y-2">
+              <label className="text-xs text-white/40 uppercase font-bold block">Quick Actions</label>
+              <div className="flex flex-wrap gap-2">
+                {games.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const last = games[0];
+                      setNewGameLocation(last.location);
+                      setNewGameTime(last.time);
+                      const nextDate = getNextWeekDateString(last.date);
+                      if (nextDate) setNewGameDate(nextDate);
+                    }}
+                    className="text-xs px-3 py-1.5 rounded-lg border bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20 transition-all flex items-center gap-1 font-bold"
+                  >
+                    🔄 Autofill Next Week Match
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="space-y-1">
-              <label className="text-xs text-white/40 uppercase font-bold">Location</label>
-              <input 
-                type="text" 
-                value={newGameLocation}
-                onChange={e => setNewGameLocation(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-lg p-2 focus:border-pitch outline-none" 
-              />
-            </div>
-            <div className="flex gap-2">
+
+            <div className="flex gap-2 justify-end border-t border-white/5 pt-4">
               <button 
                 onClick={() => createGame()}
-                className="flex-1 bg-pitch text-black font-bold py-2 rounded-lg hover:bg-pitch-dark transition-all"
+                className="bg-pitch text-black font-black py-3 px-8 rounded-xl hover:bg-pitch-dark transition-all uppercase tracking-wider text-sm flex items-center gap-2"
               >
-                Create
-              </button>
-              <button 
-                onClick={() => createGame(true)}
-                title="Copy Previous Game"
-                className="bg-white/10 p-2 rounded-lg hover:bg-white/20 transition-all"
-              >
-                <Copy size={20} className="text-white" />
+                <Plus size={16} /> Create Game
               </button>
             </div>
           </div>

@@ -317,7 +317,16 @@ const confirmed = rsvps.filter(r => r.status === 'confirmed');
             </div>
             
             <div className="flex flex-wrap gap-8 text-white/60 font-bold uppercase tracking-widest text-xs">
-              <div className="flex items-center gap-2"><MapPin size={16} /> {game.location}</div>
+              <a 
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${game.location}, Perth WA`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-white/60 hover:text-pitch transition-colors hover:underline group"
+                title="Click to navigate on Google Maps"
+              >
+                <MapPin size={16} className="group-hover:text-pitch transition-colors text-white" /> 
+                <span className="group-hover:text-pitch transition-colors">{game.location}</span>
+              </a>
               <div className="flex items-center gap-2"><Clock size={16} /> {formatTime(game.time)}</div>
               <div className="flex items-center gap-2"><Users size={16} /> {confirmed.length} Confirmed</div>
             </div>

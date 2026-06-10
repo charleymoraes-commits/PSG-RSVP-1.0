@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Game, Profile, Vote } from '../types';
 import { motion } from 'motion/react';
-import { Trophy, Calendar, Users, Award } from 'lucide-react';
+import { Trophy, Calendar, Users, Award, MapPin } from 'lucide-react';
 import { formatDate } from '../lib/utils';
 
 interface HistoryViewProps {
@@ -92,7 +92,16 @@ export default function HistoryView({ user }: HistoryViewProps) {
                   <Calendar size={18} />
                   <span>{formatDate(game.date)}</span>
                 </div>
-                <h2 className="text-2xl">{game.location}</h2>
+                <a 
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${game.location}, Perth WA`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-white hover:text-pitch transition-colors hover:underline group"
+                  title="Click to view location on Google Maps"
+                >
+                  <MapPin size={16} className="text-white group-hover:text-pitch transition-colors" /> 
+                  <h2 className="text-2xl font-bold group-hover:text-pitch transition-colors">{game.location}</h2>
+                </a>
                 <div className="flex items-center gap-4 text-sm text-white/40">
                   <div className="flex items-center gap-1"><Users size={16} /> {(game.team_a?.length || 0) + (game.team_b?.length || 0)} Players</div>
                   {game.mvp_winner && (

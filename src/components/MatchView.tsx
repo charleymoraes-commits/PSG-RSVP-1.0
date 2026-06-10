@@ -363,7 +363,16 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
           <div className="space-y-2">
             <h1 className="text-5xl md:text-7xl font-black tracking-tighter italic">NEXT MATCH</h1>
             <div className="flex flex-wrap justify-center gap-6 text-white/40 font-bold uppercase tracking-widest text-sm">
-              <div className="flex items-center gap-2"><MapPin size={16} className="text-white" /> {nextGame.location}</div>
+              <a 
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${nextGame.location}, Perth WA`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-white/40 hover:text-pitch transition-colors hover:underline group"
+                title="Click to navigate on Google Maps"
+              >
+                <MapPin size={16} className="text-white group-hover:text-pitch transition-colors" /> 
+                <span className="text-white group-hover:text-pitch transition-colors">{nextGame.location}</span>
+              </a>
               <div className="flex items-center gap-2"><Clock size={16} className="text-white" /> {formatTime(nextGame.time)}</div>
               <div className="flex items-center gap-2"><Trophy size={16} className="text-white" /> {formatDate(nextGame.date)}</div>
             </div>
