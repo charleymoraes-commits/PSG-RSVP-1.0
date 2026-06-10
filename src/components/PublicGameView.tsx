@@ -24,6 +24,8 @@ export default function PublicGameView({ gameId }: PublicGameViewProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUserProfile, setCurrentUserProfile] = useState<Profile | null>(null);
+  const [rsvpMessage, setRsvpMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
   const fetchRSVPs = async () => {
@@ -78,9 +80,119 @@ export default function PublicGameView({ gameId }: PublicGameViewProps) {
     }
   };
 
+  const handleRSVPAction = async (going: boolean) => {
+    if (!currentUser) {
+      window.location.href = '/';
+      return;
+    }
+
+    if (currentUserProfile && !currentUserProfile.is_approved) {
+      setRsvpMessage({ type: 'error', text: 'Your account is pending approval by an admin.' });
+      return;
+    }
+
+    setActionLoading(true);
+    setRsvpMessage(null);
+    try {
+      // Fetch fresh data to avoid stale state issues
+      const { data: currentRSVPs, error: fetchError } = await supabase
+        .from('rsvps')
+        .select('*, profiles(*)')
+        .eq('game_id', gameId)
+        .order('created_at', { ascending: true });
+
+      if (fetchError) throw fetchError;
+      
+      const latestRSVPs = currentRSVPs || [];
+      const existingRSVP = latestRSVPs.find(r => r.user_id === currentUser.id);
+      
+      if (going) {
+        // Handle "I'M IN"
+        if (existingRSVP && (existingRSVP.status === 'confirmed' || existingRSVP.status === 'waiting')) {
+          setRsvpMessage({ type: 'success', text: "You're already on the squad!" });
+          return;
+        }
+
+        const confirmedCount = latestRSVPs.filter((r: any) => r.status === 'confirmed').length;
+        const newStatus = confirmedCount < 22 ? 'confirmed' : 'waiting';
+
+        if (existingRSVP) {
+          const { error: updateError } = await supabase
+            .from('rsvps')
+            .update({ status: newStatus, created_at: new Date().toISOString() })
+            .eq('id', existingRSVP.id);
+          if (updateError) throw updateError;
+        } else {
+          const { error: insertError } = await supabase.from('rsvps').insert({
+            game_id: gameId,
+            user_id: currentUser.id,
+            status: newStatus
+          });
+          if (insertError) throw insertError;
+        }
+        setRsvpMessage({ type: 'success', text: newStatus === 'confirmed' ? "Awesome! You are confirmed for this match." : 'You have been added to the waiting list.' });
+      } else {
+        // Handle "I'M OUT"
+        if (existingRSVP && existingRSVP.status === 'declined') {
+          setRsvpMessage({ type: 'success', text: "You've already declined." });
+          return;
+        }
+
+        const wasConfirmed = existingRSVP?.status === 'confirmed';
+
+        // Try to update to 'declined'. If this fails due to DB constraint, fallback to delete.
+        const { error: updateError } = await (existingRSVP 
+          ? supabase.from('rsvps').update({ status: 'declined' }).eq('id', existingRSVP.id)
+          : supabase.from('rsvps').insert({ game_id: gameId, user_id: currentUser.id, status: 'declined' }));
+
+        if (updateError) {
+          if (updateError.message.includes('violates check constraint') || updateError.message.includes('check constraint "rsvps_status_check"')) {
+            // Fallback: If 'declined' isn't supported, just delete the entry (old behavior)
+            if (existingRSVP) {
+              const { error: deleteError } = await supabase.from('rsvps').delete().eq('id', existingRSVP.id);
+              if (deleteError) throw deleteError;
+              setRsvpMessage({ type: 'success', text: 'Successfully withdrew your RSVP.' });
+            } else {
+              setRsvpMessage({ type: 'success', text: 'Already out.' });
+            }
+          } else {
+            throw updateError;
+          }
+        } else {
+          setRsvpMessage({ type: 'success', text: 'Successfully cancelled/declined your RSVP.' });
+        }
+
+        // Manual Promotion: If a confirmed player withdraws, promote the first waiting player
+        if (wasConfirmed && game?.status === 'open') {
+          const firstWaiting = latestRSVPs.find((r: any) => r.status === 'waiting');
+          if (firstWaiting) {
+            await supabase.from('rsvps').update({ status: 'confirmed' }).eq('id', firstWaiting.id);
+          }
+        }
+      }
+      
+      await fetchRSVPs();
+      setTimeout(() => setRsvpMessage(null), 5000);
+    } catch (err: any) {
+      setRsvpMessage({ type: 'error', text: err.message });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
       setCurrentUser(user);
+      if (user) {
+        supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single()
+          .then(({ data }) => {
+            if (data) setCurrentUserProfile(data);
+          });
+      }
     });
 
     fetchGameData();
@@ -287,12 +399,19 @@ const confirmed = rsvps.filter(r => r.status === 'confirmed');
           >
             <RotateCw size={16} className={cn(loading && "animate-spin")} />
           </button>
-          {!currentUser && (
+          {!currentUser ? (
             <button 
               onClick={() => window.location.href = '/'}
-              className="text-[10px] font-black uppercase tracking-widest bg-white text-black px-4 py-1.5 rounded-full hover:bg-white/90 transition-all"
+              className="text-[10px] font-black uppercase tracking-widest bg-white text-black px-4 py-1.5 rounded-full hover:bg-white/90 transition-all font-bold"
             >
               Login to RSVP
+            </button>
+          ) : (
+            <button 
+              onClick={() => window.location.href = '/'}
+              className="text-[10px] font-black uppercase tracking-widest bg-white/10 text-white hover:bg-white/20 border border-white/20 px-4 py-1.5 rounded-full transition-all font-bold"
+            >
+              Go to App
             </button>
           )}
         </div>
@@ -364,6 +483,113 @@ const confirmed = rsvps.filter(r => r.status === 'confirmed');
             </div>
           )}
         </div>
+
+        {/* Dynamic RSVP Action Card */}
+        {game.status === 'open' && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="glass-card p-6 md:p-8 rounded-3xl border border-white/10 bg-white/5 relative overflow-hidden"
+          >
+            <div className="absolute top-0 left-0 w-1.5 h-full bg-pitch" />
+            
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div>
+                <h3 className="text-xs font-black tracking-widest text-pitch uppercase mb-1 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-pitch animate-pulse" />
+                  Your Match Participation
+                </h3>
+                {currentUser ? (
+                  <div className="space-y-1">
+                    <p className="text-xl font-bold">
+                      Hello, {currentUserProfile?.full_name || currentUser.email?.split('@')[0]}!
+                    </p>
+                    <p className="text-sm text-white/60">
+                      {(() => {
+                        const myRSVP = rsvps.find(r => r.user_id === currentUser.id);
+                        if (!myRSVP) return "You haven't registered your status for this match yet.";
+                        if (myRSVP.status === 'confirmed') return "🎉 You are CONFIRMED in the squad!";
+                        if (myRSVP.status === 'waiting') return "⏳ You are currently on the WAITING list.";
+                        return "❌ You are listed as DECLINED (OUT).";
+                      })()}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <p className="text-lg font-bold">Confirm your spot for Tuesday</p>
+                    <p className="text-sm text-white/40">Log in to RSVP, join the squad, or update your status instantly.</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                {currentUser ? (
+                  <div className="flex flex-wrap gap-3">
+                    {(() => {
+                      const myRSVP = rsvps.find(r => r.user_id === currentUser.id);
+                      const isConfirmed = myRSVP?.status === 'confirmed';
+                      const isWaiting = myRSVP?.status === 'waiting';
+                      const isDeclined = myRSVP?.status === 'declined';
+                      
+                      return (
+                        <>
+                          <button
+                            onClick={() => handleRSVPAction(true)}
+                            disabled={actionLoading}
+                            className={cn(
+                              "text-xs font-black uppercase tracking-wider px-6 py-3 rounded-xl transition-all flex items-center gap-2",
+                              (isConfirmed || isWaiting)
+                                ? "bg-pitch text-black font-extrabold cursor-default pointer-events-none"
+                                : "bg-white/5 border border-white/10 text-white hover:border-pitch hover:text-pitch cursor-pointer"
+                            )}
+                          >
+                            {actionLoading ? <Loader2 className="animate-spin w-4 h-4" /> : "I'm IN ⚽"}
+                          </button>
+                          
+                          <button
+                            onClick={() => handleRSVPAction(false)}
+                            disabled={actionLoading}
+                            className={cn(
+                              "text-xs font-black uppercase tracking-wider px-6 py-3 rounded-xl transition-all flex items-center gap-2",
+                              isDeclined
+                                ? "bg-red-500 text-white font-extrabold cursor-default pointer-events-none"
+                                : "bg-white/5 border border-white/10 text-white hover:border-red-500 hover:text-red-500 cursor-pointer"
+                            )}
+                          >
+                            {actionLoading ? <Loader2 className="animate-spin w-4 h-4" /> : "I'm OUT ❌"}
+                          </button>
+                        </>
+                      );
+                    })()}
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => window.location.href = '/'}
+                    className="bg-white text-black text-xs font-black uppercase tracking-widest px-6 py-3 rounded-xl hover:bg-white/90 transition-all flex items-center gap-2 font-bold cursor-pointer"
+                  >
+                    Sign-In to RSVP <ExternalLink size={14} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Notification message banner */}
+            {rsvpMessage && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                className={cn(
+                  "mt-4 p-3 rounded-lg text-xs font-bold border",
+                  rsvpMessage.type === 'success' 
+                    ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" 
+                    : "bg-red-500/10 border-red-500/20 text-red-400"
+                )}
+              >
+                {rsvpMessage.text}
+              </motion.div>
+            )}
+          </motion.div>
+        )}
 
         {/* Live MVP & MSP Voting Sections OR Player Lists */}
         <AnimatePresence mode="wait">
