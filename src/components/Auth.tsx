@@ -85,11 +85,17 @@ export default function Auth() {
   const isForgot = view === 'forgot';
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
+    <div 
+      className="min-h-screen flex items-center justify-center p-4 relative bg-cover bg-center bg-no-repeat"
+      style={{ backgroundImage: `url('/bg_image.png')` }}
+    >
+      {/* Dark premium overlay with backdrop blur for high-contrast accessibility */}
+      <div className="absolute inset-0 bg-black/65 backdrop-blur-md z-0" />
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="glass-card w-full max-w-md p-6 md:p-8 neon-glow"
+        className="glass-card w-full max-w-md p-6 md:p-8 neon-glow relative z-10"
       >
         <div className="text-center mb-8">
           <h1 className="text-4xl mb-2 text-white font-black tracking-tighter italic">PSG PERTH</h1>
