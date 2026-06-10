@@ -338,7 +338,7 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="glass-card p-8 md:p-12 relative overflow-hidden neon-border"
+        className="glass-card pt-16 pb-8 px-6 md:p-12 relative overflow-hidden neon-border"
       >
         <div className="absolute top-0 right-0 p-4 flex items-center gap-3">
           <button 
