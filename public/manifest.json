@@ -1,0 +1,18 @@
+{
+  "name": "Perth Soccer Group",
+  "short_name": "PSG Perth",
+  "description": "Weekly match RSVP, lineups, and live MVP/MSP voting for Perth Soccer Group.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "/fav_icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
