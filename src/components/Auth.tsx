@@ -87,7 +87,7 @@ export default function Auth() {
   return (
     <div 
       className="min-h-screen flex items-center justify-center p-4 relative bg-cover bg-center bg-no-repeat"
-      style={{ backgroundImage: `url('/bg_image.png')` }}
+      style={{ backgroundImage: `url('/bg_image.png?v=2')` }}
     >
       {/* Dark premium overlay with backdrop blur for high-contrast accessibility */}
       <div className="absolute inset-0 bg-black/65 backdrop-blur-md z-0" />
