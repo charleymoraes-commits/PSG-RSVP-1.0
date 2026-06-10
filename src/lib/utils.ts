@@ -26,3 +26,23 @@ export function formatTime(time: string) {
   }
   return time;
 }
+
+export function getOrdinalSuffix(day: number) {
+  if (day > 3 && day < 21) return 'th';
+  switch (day % 10) {
+    case 1:  return "st";
+    case 2:  return "nd";
+    case 3:  return "rd";
+    default: return "th";
+  }
+}
+
+export function formatRsvpTime(dateStr: string) {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  const day = date.getDate();
+  const suffix = getOrdinalSuffix(day);
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${day}${suffix} ${hours}:${minutes}`;
+}

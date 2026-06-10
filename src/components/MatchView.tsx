@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { Game, RSVP, Profile, Vote as VoteType, MSPVote } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { Users, MapPin, Clock, Trophy, Shuffle, CheckCircle2, AlertCircle, ShieldAlert, Loader2, Vote as VoteIcon, Check, RotateCw, X, Frown } from 'lucide-react';
-import { cn, formatDate, formatTime } from '../lib/utils';
+import { cn, formatDate, formatTime, formatRsvpTime } from '../lib/utils';
 
 interface MatchViewProps {
   user: any;
@@ -656,6 +656,11 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
                   <span className="text-white/20 font-black italic w-6">{i + 1}</span>
                   <span className="font-bold">{rsvp.profiles?.full_name}</span>
                 </div>
+                {rsvp.created_at && (
+                  <span className="text-[10px] font-mono text-white/40 tracking-wider font-semibold">
+                    {formatRsvpTime(rsvp.created_at)}
+                  </span>
+                )}
               </div>
             ))}
           </div>
@@ -672,6 +677,11 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
                   <span className="text-white/20 font-black italic w-6">{i + 1}</span>
                   <span className="font-bold">{rsvp.profiles?.full_name}</span>
                 </div>
+                {rsvp.created_at && (
+                  <span className="text-[10px] font-mono text-white/30 tracking-wider font-semibold">
+                    {formatRsvpTime(rsvp.created_at)}
+                  </span>
+                )}
               </div>
             ))}
           </div>
@@ -688,6 +698,11 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
                   <span className="text-white/20 font-black italic w-6">{i + 1}</span>
                   <span className="font-bold">{rsvp.profiles?.full_name}</span>
                 </div>
+                {rsvp.created_at && (
+                  <span className="text-[10px] font-mono text-white/20 tracking-wider font-semibold">
+                    {formatRsvpTime(rsvp.created_at)}
+                  </span>
+                )}
               </div>
             ))}
           </div>

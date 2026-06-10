@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { Game, RSVP, Profile } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { MapPin, Clock, Trophy, CheckCircle2, Shuffle, Loader2, BarChart3, Users, ExternalLink, Check, RotateCw, X, Frown } from 'lucide-react';
-import { cn, formatTime, formatDate } from '../lib/utils';
+import { cn, formatTime, formatDate, formatRsvpTime } from '../lib/utils';
 
 interface PublicGameViewProps {
   gameId: string;
@@ -843,7 +843,11 @@ const confirmed = rsvps.filter(r => r.status === 'confirmed');
                           <span className="text-white/20 font-black italic w-6 group-hover:text-white/40 transition-colors">{i + 1}</span>
                           <span className="font-bold tracking-tight">{rsvp.profiles?.full_name || 'Unknown Player'}</span>
                         </div>
-                        {game.status === 'open' && <div className="w-2 h-2 rounded-full bg-white/20" />}
+                        {rsvp.created_at && (
+                          <span className="text-[10px] font-mono text-white/40 tracking-wider font-semibold">
+                            {formatRsvpTime(rsvp.created_at)}
+                          </span>
+                        )}
                       </div>
                     ))}
                     {confirmed.length === 0 && <p className="text-white/10 italic p-4">Waiting for players to join...</p>}
@@ -863,6 +867,11 @@ const confirmed = rsvps.filter(r => r.status === 'confirmed');
                           <span className="text-white/20 font-black italic w-6">{i + 1}</span>
                           <span className="font-bold tracking-tight">{rsvp.profiles?.full_name || 'Unknown Player'}</span>
                         </div>
+                        {rsvp.created_at && (
+                          <span className="text-[10px] font-mono text-white/30 tracking-wider font-semibold">
+                            {formatRsvpTime(rsvp.created_at)}
+                          </span>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -881,6 +890,11 @@ const confirmed = rsvps.filter(r => r.status === 'confirmed');
                           <span className="text-white/20 font-black italic w-6">{i + 1}</span>
                           <span className="font-bold tracking-tight">{rsvp.profiles?.full_name || 'Unknown Player'}</span>
                         </div>
+                        {rsvp.created_at && (
+                          <span className="text-[10px] font-mono text-white/20 tracking-wider font-semibold">
+                            {formatRsvpTime(rsvp.created_at)}
+                          </span>
+                        )}
                       </div>
                     ))}
                   </div>
