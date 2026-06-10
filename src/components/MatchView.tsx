@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Game, RSVP, Profile, Vote as VoteType } from '../types';
+import { Game, RSVP, Profile, Vote as VoteType, MSPVote } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Users, MapPin, Clock, Trophy, Shuffle, CheckCircle2, AlertCircle, ShieldAlert, Loader2, Vote as VoteIcon, Check, RotateCw, X } from 'lucide-react';
+import { Users, MapPin, Clock, Trophy, Shuffle, CheckCircle2, AlertCircle, ShieldAlert, Loader2, Vote as VoteIcon, Check, RotateCw, X, Frown } from 'lucide-react';
 import { cn, formatDate, formatTime } from '../lib/utils';
 
 interface MatchViewProps {
@@ -15,6 +15,7 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
   const [nextGame, setNextGame] = useState<Game | null>(null);
   const [rsvps, setRsvps] = useState<RSVP[]>([]);
   const [votes, setVotes] = useState<VoteType[]>([]);
+  const [mspVotes, setMspVotes] = useState<MSPVote[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,10 +39,16 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
       .on('postgres_changes', { event: '*', schema: 'public', table: 'votes' }, () => fetchVotes())
       .subscribe();
 
+    const mspVoteSubscription = supabase
+      .channel('msp_vote_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'msp_votes' }, () => fetchMspVotes())
+      .subscribe();
+
     return () => {
       supabase.removeChannel(gameSubscription);
       supabase.removeChannel(rsvpSubscription);
       supabase.removeChannel(voteSubscription);
+      supabase.removeChannel(mspVoteSubscription);
     };
   }, []);
 
@@ -49,6 +56,7 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
     if (nextGame) {
       fetchRSVPs();
       fetchVotes();
+      fetchMspVotes();
     }
   }, [nextGame]);
 
@@ -87,6 +95,21 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
 
     if (error) console.error('Error fetching votes:', error);
     if (data) setVotes(data);
+  };
+
+  const fetchMspVotes = async () => {
+    if (!nextGame) return;
+    const { data, error } = await supabase
+      .from('msp_votes')
+      .select('*')
+      .eq('game_id', nextGame.id);
+
+    if (error) {
+      // Graceful fallback if table is not yet created
+      console.warn('Error fetching msp_votes (table might need to be created in Supabase):', error);
+      return;
+    }
+    if (data) setMspVotes(data);
   };
 
   const handleRSVP = async (going: boolean) => {
@@ -208,6 +231,12 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
       return;
     }
 
+    // Restriction: Cannot vote for same user as MSP
+    if (myMspVote && myMspVote.candidate_id === candidateId) {
+      setError('You cannot vote for your MSP choice as MVP!');
+      return;
+    }
+
     setActionLoading(true);
     try {
       const { error } = await supabase.from('votes').insert({
@@ -221,6 +250,46 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
       setTimeout(() => setSuccess(null), 3000);
     } catch (err: any) {
       setError(err.code === '23505' ? 'You have already voted!' : err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleMspVote = async (candidateId: string) => {
+    if (!nextGame || !user) return;
+    
+    // Eligibility check: Only confirmed players can vote
+    const isConfirmed = rsvps.some(r => r.user_id === user.id && r.status === 'confirmed');
+    if (!isConfirmed) {
+      setError('Only players confirmed for this match can vote.');
+      return;
+    }
+
+    // Restriction: Cannot vote for self
+    if (candidateId === user.id) {
+      setError('You cannot vote for yourself!');
+      return;
+    }
+
+    // Restriction: Cannot vote for same user as MVP
+    if (myVote && myVote.candidate_id === candidateId) {
+      setError('You cannot vote for your MVP choice as the Most Shitty Player!');
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      const { error } = await supabase.from('msp_votes').insert({
+        game_id: nextGame.id,
+        voter_id: user.id,
+        candidate_id: candidateId
+      });
+      if (error) throw error;
+      setSuccess('Most Shitty Player vote cast successfully!');
+      fetchMspVotes();
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err: any) {
+      setError(err.code === '23505' ? 'You have already voted for MSP!' : err.message);
     } finally {
       setActionLoading(false);
     }
@@ -252,9 +321,14 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
   const isIn = myRSVP && (myRSVP.status === 'confirmed' || myRSVP.status === 'waiting');
   const isOut = myRSVP && myRSVP.status === 'declined';
   const myVote = votes.find(v => v.voter_id === user?.id);
+  const myMspVote = mspVotes.find(v => v.voter_id === user?.id);
 
   const getVoteCount = (playerId: string) => {
     return votes.filter(v => v.candidate_id === playerId).length;
+  };
+
+  const getMspVoteCount = (playerId: string) => {
+    return mspVotes.filter(v => v.candidate_id === playerId).length;
   };
 
   return (
@@ -367,72 +441,164 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
 
       {/* MVP Voting Section */}
       {nextGame.status === 'voting' && (
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="glass-card p-8 border-2 border-blue-500/30 space-y-8"
-        >
-          <div className="text-center space-y-2">
-            <h2 className="text-3xl font-black italic tracking-tighter flex items-center justify-center gap-3">
-              <VoteIcon className="text-blue-500" size={32} /> WHO WAS THE BEST ON PITCH?
-            </h2>
-            <p className="text-white/40 text-sm font-bold uppercase tracking-widest">Live Poll Results</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {[...nextGame.team_a, ...nextGame.team_b].map(player => {
-              const voteCount = getVoteCount(player.id);
-              const isVotedByMe = myVote?.candidate_id === player.id;
-              const isMe = player.id === user?.id;
-
-              return (
-                <button
-                  key={player.id}
-                  onClick={() => handleVote(player.id)}
-                  disabled={actionLoading || !!myVote || isMe}
-                  className={cn(
-                    "relative group flex items-center justify-between p-4 rounded-2xl border transition-all overflow-hidden",
-                    isVotedByMe 
-                      ? "bg-white text-black border-white shadow-[0_0_20px_rgba(255,255,255,0.5)]" 
-                      : "bg-white/5 border-white/10 hover:border-blue-500/50 hover:bg-white/10",
-                    (!!myVote || isMe) && !isVotedByMe && "opacity-50 cursor-not-allowed"
-                  )}
-                >
-                  {/* Progress Bar Background */}
-                  {votes.length > 0 && (
-                    <div 
-                      className="absolute inset-0 bg-blue-500/10 transition-all duration-1000" 
-                      style={{ width: `${(voteCount / votes.length) * 100}%` }}
-                    />
-                  )}
-
-                  <div className="relative flex items-center gap-3">
-                    <div className={cn(
-                      "w-8 h-8 rounded-full flex items-center justify-center text-xs font-black",
-                      isVotedByMe ? "bg-blue-500 text-white" : "bg-white/10 text-white/40"
-                    )}>
-                      {isVotedByMe ? <Check size={16} /> : voteCount}
-                    </div>
-                    <span className="font-bold tracking-tight">{player.full_name}</span>
-                    {isMe && <span className="text-[10px] uppercase bg-white/10 px-2 py-0.5 rounded text-white/40">You</span>}
-                  </div>
-
-                  <div className="relative text-xs font-black uppercase tracking-widest opacity-40 group-hover:opacity-100 transition-opacity">
-                    {isVotedByMe ? "Your Vote" : `${voteCount} ${voteCount === 1 ? 'Vote' : 'Votes'}`}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          {myVote && (
-            <div className="text-center">
-              <p className="text-blue-400 text-sm font-bold flex items-center justify-center gap-2">
-                <CheckCircle2 size={16} /> You have cast your vote!
+        <div className="space-y-8">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="glass-card p-8 border-2 border-blue-500/30 space-y-8"
+          >
+            <div className="text-center space-y-2">
+              <h2 className="text-3xl font-black italic tracking-tighter flex items-center justify-center gap-3 text-blue-500">
+                <VoteIcon size={32} /> WHO WAS THE BEST ON PITCH?
+              </h2>
+              <p className="text-white/40 text-sm font-bold uppercase tracking-widest">
+                Live Poll Results • Can't vote for yourself or your MSP candidate!
               </p>
             </div>
-          )}
-        </motion.div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[...nextGame.team_a, ...nextGame.team_b].map(player => {
+                const voteCount = getVoteCount(player.id);
+                const isVotedByMe = myVote?.candidate_id === player.id;
+                const isMe = player.id === user?.id;
+                const isMyMspChoice = myMspVote?.candidate_id === player.id;
+                const isDisabled = actionLoading || !!myVote || isMe || isMyMspChoice;
+
+                return (
+                  <button
+                    key={player.id}
+                    onClick={() => handleVote(player.id)}
+                    disabled={isDisabled}
+                    className={cn(
+                      "relative group flex items-center justify-between p-4 rounded-2xl border transition-all overflow-hidden text-left",
+                      isVotedByMe 
+                        ? "bg-white text-black border-white shadow-[0_0_20px_rgba(255,255,255,0.5)]" 
+                        : isMyMspChoice 
+                          ? "bg-white/5 border-white/5 opacity-30 cursor-not-allowed"
+                          : "bg-white/5 border-white/10 hover:border-blue-500/50 hover:bg-white/10",
+                      isDisabled && !isVotedByMe && "opacity-50 cursor-not-allowed"
+                    )}
+                  >
+                    {/* Progress Bar Background */}
+                    {votes.length > 0 && (
+                      <div 
+                        className="absolute inset-0 bg-blue-500/10 transition-all duration-1000 animate-pulse" 
+                        style={{ width: `${(voteCount / votes.length) * 100}%` }}
+                      />
+                    )}
+
+                    <div className="relative flex items-center gap-3 z-10">
+                      <div className={cn(
+                        "w-8 h-8 rounded-full flex items-center justify-center text-xs font-black",
+                        isVotedByMe ? "bg-blue-500 text-white" : "bg-white/10 text-white/40"
+                      )}>
+                        {isVotedByMe ? <Check size={16} /> : voteCount}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="font-bold tracking-tight">{player.full_name}</span>
+                        <div className="flex gap-1.5 mt-0.5">
+                          {isMe && <span className="text-[10px] uppercase bg-white/10 px-2 py-0.5 rounded text-white/40">You</span>}
+                          {isMyMspChoice && <span className="text-[9px] uppercase bg-red-500/10 px-2   py-0.5 rounded text-red-500 font-extrabold border border-red-500/20">Your MSP choice</span>}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="relative text-xs font-black uppercase tracking-widest opacity-40 group-hover:opacity-100 transition-opacity z-10">
+                      {isVotedByMe ? "Your Vote" : `${voteCount} ${voteCount === 1 ? 'Vote' : 'Votes'}`}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {myVote && (
+              <div className="text-center">
+                <p className="text-blue-400 text-sm font-bold flex items-center justify-center gap-2">
+                  <CheckCircle2 size={16} /> You have cast your MVP vote!
+                </p>
+              </div>
+            )}
+          </motion.div>
+
+          {/* MSP Voting Section */}
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="glass-card p-8 border-2 border-red-500/30 space-y-8"
+          >
+            <div className="text-center space-y-2">
+              <h2 className="text-3xl font-black italic tracking-tighter flex items-center justify-center gap-3 text-red-500">
+                <Frown size={32} /> WHO WAS THE MOST SHITTY ON PITCH? (MSP)
+              </h2>
+              <p className="text-white/40 text-sm font-bold uppercase tracking-widest leading-relaxed">
+                Live Poll Results • Can't vote for yourself or your MVP candidate!
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[...nextGame.team_a, ...nextGame.team_b].map(player => {
+                const voteCount = getMspVoteCount(player.id);
+                const isVotedByMe = myMspVote?.candidate_id === player.id;
+                const isMe = player.id === user?.id;
+                const isMyMvpChoice = myVote?.candidate_id === player.id;
+                const isDisabled = actionLoading || !!myMspVote || isMe || isMyMvpChoice;
+
+                return (
+                  <button
+                    key={player.id}
+                    onClick={() => handleMspVote(player.id)}
+                    disabled={isDisabled}
+                    className={cn(
+                      "relative group flex items-center justify-between p-4 rounded-2xl border transition-all overflow-hidden text-left",
+                      isVotedByMe 
+                        ? "bg-white text-black border-white shadow-[0_0_20px_rgba(239,68,68,0.5)]" 
+                        : isMyMvpChoice 
+                          ? "bg-white/5 border-white/5 opacity-30 cursor-not-allowed"
+                          : "bg-white/5 border-white/10 hover:border-red-500/50 hover:bg-white/10",
+                      isDisabled && !isVotedByMe && "opacity-50 cursor-not-allowed"
+                    )}
+                  >
+                    {/* Progress Bar Background */}
+                    {mspVotes.length > 0 && (
+                      <div 
+                        className="absolute inset-0 bg-red-500/10 transition-all duration-1000 animate-pulse" 
+                        style={{ width: `${(voteCount / mspVotes.length) * 100}%` }}
+                      />
+                    )}
+
+                    <div className="relative flex items-center gap-3 z-10">
+                      <div className={cn(
+                        "w-8 h-8 rounded-full flex items-center justify-center text-xs font-black",
+                        isVotedByMe ? "bg-red-500 text-white" : "bg-white/10 text-white/40"
+                      )}>
+                        {isVotedByMe ? <Check size={16} /> : voteCount}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="font-bold tracking-tight">{player.full_name}</span>
+                        <div className="flex gap-1.5 mt-0.5">
+                          {isMe && <span className="text-[10px] uppercase bg-white/10 px-2 py-0.5 rounded text-white/40">You</span>}
+                          {isMyMvpChoice && <span className="text-[9px] uppercase bg-blue-500/10 px-2 py-0.5 rounded text-blue-400 font-extrabold border border-blue-500/20">Your MVP choice</span>}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="relative text-xs font-black uppercase tracking-widest opacity-40 group-hover:opacity-100 transition-opacity z-10">
+                      {isVotedByMe ? "Your Vote" : `${voteCount} ${voteCount === 1 ? 'Vote' : 'Votes'}`}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {myMspVote && (
+              <div className="text-center">
+                <p className="text-red-400 text-sm font-bold flex items-center justify-center gap-2">
+                  <CheckCircle2 size={16} /> You have cast your MSP vote!
+                </p>
+              </div>
+            )}
+          </motion.div>
+        </div>
       )}
 
       {/* Player Lists */}

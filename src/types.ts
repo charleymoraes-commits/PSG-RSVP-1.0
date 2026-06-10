@@ -16,6 +16,7 @@ export interface Game {
   team_a: Profile[];
   team_b: Profile[];
   mvp_winner?: string;
+  msp_winner?: string;
   created_at: string;
 }
 
@@ -29,6 +30,14 @@ export interface RSVP {
 }
 
 export interface Vote {
+  id: string;
+  game_id: string;
+  voter_id: string;
+  candidate_id: string;
+  created_at: string;
+}
+
+export interface MSPVote {
   id: string;
   game_id: string;
   voter_id: string;

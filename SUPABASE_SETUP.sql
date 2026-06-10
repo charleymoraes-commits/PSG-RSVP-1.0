@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS games (
   team_a JSONB DEFAULT '[]'::jsonb,
   team_b JSONB DEFAULT '[]'::jsonb,
   mvp_winner TEXT,
+  msp_winner TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
@@ -35,6 +36,16 @@ CREATE TABLE IF NOT EXISTS rsvps (
 
 -- 4. Votes Table
 CREATE TABLE IF NOT EXISTS votes (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  game_id UUID REFERENCES games(id) ON DELETE CASCADE NOT NULL,
+  voter_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  candidate_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+  UNIQUE(game_id, voter_id)
+);
+
+-- 4b. MSP Votes Table
+CREATE TABLE IF NOT EXISTS msp_votes (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   game_id UUID REFERENCES games(id) ON DELETE CASCADE NOT NULL,
   voter_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
@@ -119,6 +130,12 @@ CREATE POLICY "Votes are viewable by everyone" ON votes FOR SELECT USING (true);
 DROP POLICY IF EXISTS "Users can vote once per game" ON votes;
 CREATE POLICY "Users can vote once per game" ON votes FOR INSERT WITH CHECK (auth.uid() = voter_id);
 
+ALTER TABLE msp_votes ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "MSP Votes are viewable by everyone" ON msp_votes;
+CREATE POLICY "MSP Votes are viewable by everyone" ON msp_votes FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Users can vote once for MSP per game" ON msp_votes;
+CREATE POLICY "Users can vote once for MSP per game" ON msp_votes FOR INSERT WITH CHECK (auth.uid() = voter_id);
+
 -- 7. Profile Creation Trigger
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
@@ -141,6 +158,7 @@ FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 ALTER TABLE rsvps REPLICA IDENTITY FULL;
 ALTER TABLE games REPLICA IDENTITY FULL;
 ALTER TABLE votes REPLICA IDENTITY FULL;
+ALTER TABLE msp_votes REPLICA IDENTITY FULL;
 
 DO $$
 BEGIN
@@ -152,5 +170,8 @@ BEGIN
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'votes') THEN
     ALTER PUBLICATION supabase_realtime ADD TABLE votes;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'msp_votes') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE msp_votes;
   END IF;
 END $$;

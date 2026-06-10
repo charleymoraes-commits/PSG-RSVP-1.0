@@ -152,6 +152,20 @@ export default function AdminView() {
         const winner = profiles.find(p => p.id === winnerId);
         if (winner) updateData.mvp_winner = winner.full_name;
       }
+
+      // Calculate MSP
+      const { data: mspVotes } = await supabase
+        .from('msp_votes')
+        .select('candidate_id')
+        .eq('game_id', gameId);
+
+      if (mspVotes && mspVotes.length > 0) {
+        const mspCounts: Record<string, number> = {};
+        mspVotes.forEach(v => mspCounts[v.candidate_id] = (mspCounts[v.candidate_id] || 0) + 1);
+        const mspWinnerId = Object.entries(mspCounts).sort((a, b) => b[1] - a[1])[0][0];
+        const mspWinner = profiles.find(p => p.id === mspWinnerId);
+        if (mspWinner) updateData.msp_winner = mspWinner.full_name;
+      }
     }
 
     const { error } = await supabase.from('games').update(updateData).eq('id', gameId);
@@ -401,7 +415,7 @@ export default function AdminView() {
               <div className="space-y-1">
                 <div className="font-black text-xl tracking-tight">{game.date}</div>
                 <div className="text-sm text-white/40 font-bold uppercase tracking-widest">
-                  {game.location} • MVP: {game.mvp_winner || 'N/A'}
+                  {game.location} • MVP: {game.mvp_winner || 'N/A'} • MSP: {game.msp_winner || 'N/A'}
                 </div>
               </div>
               
