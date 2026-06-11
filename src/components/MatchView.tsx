@@ -4,7 +4,7 @@ import { Game, RSVP, Profile, Vote as VoteType, MSPVote } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { Users, MapPin, Clock, Trophy, Shuffle, CheckCircle2, AlertCircle, ShieldAlert, Loader2, Vote as VoteIcon, Check, RotateCw, X, Frown } from 'lucide-react';
 import { cn, formatDate, formatTime, formatRsvpTime } from '../lib/utils';
-import athleteRunningImg from '../assets/images/athlete_running_1781141095155.png';
+import athleteRunningImg from '../assets/images/ronaldo_2002_running_1781141795225.png';
 import athleteSittingImg from '../assets/images/athlete_sitting_1781141114349.png';
 
 interface MatchViewProps {
