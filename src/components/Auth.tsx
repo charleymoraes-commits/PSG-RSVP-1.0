@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { motion } from 'motion/react';
 import { LogIn, UserPlus, Loader2, Check, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import bgImage from '../assets/images/bg_image_1781064072635.png';
 
 export default function Auth() {
   const [email, setEmail] = useState('');
@@ -87,10 +88,10 @@ export default function Auth() {
   return (
     <div 
       className="min-h-screen flex items-center justify-center p-4 relative bg-cover bg-center bg-no-repeat"
-      style={{ backgroundImage: `url('/bg_image.png?v=2')` }}
+      style={{ backgroundImage: `url(${bgImage})` }}
     >
       {/* Dark premium overlay with backdrop blur for high-contrast accessibility */}
-      <div className="absolute inset-0 bg-black/65 backdrop-blur-md z-0" />
+      <div className="absolute inset-0 bg-black/55 backdrop-blur-[3px] z-0" />
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
