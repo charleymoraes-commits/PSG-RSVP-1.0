@@ -459,7 +459,27 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
                     "text-[10px] font-black tracking-widest uppercase transition-colors duration-300",
                     isIn ? "text-[#00ff66]" : "text-white/40 group-hover:text-white"
                   )}>
-                    {isIn ? "Confirmed RSVP" : "Ready to play?"}
+                    {(() => {
+                      if (!isIn) return "Ready to play?";
+                      const myRSVP = rsvps.find(r => r.user_id === user?.id);
+                      if (myRSVP?.status === 'confirmed') {
+                        const idx = confirmed.findIndex(r => r.user_id === user?.id);
+                        if (idx !== -1) {
+                          const getOrdinal = (n: number) => {
+                            const s = ["th", "st", "nd", "rd"];
+                            const v = n % 100;
+                            return n + (s[(v - 20) % 10] || s[v] || s[0]);
+                          };
+                          return `Confirmed RSVP • ${getOrdinal(idx + 1)} on the list`;
+                        }
+                      } else if (myRSVP?.status === 'waiting') {
+                        const idx = waiting.findIndex(r => r.user_id === user?.id);
+                        if (idx !== -1) {
+                          return `Waitlisted RSVP • Position #${idx + 1}`;
+                        }
+                      }
+                      return "Confirmed RSVP";
+                    })()}
                   </p>
                   <h3 className="text-3xl font-black italic tracking-tighter text-white uppercase mt-1 flex items-center gap-2">
                     {actionLoading && isIn ? (

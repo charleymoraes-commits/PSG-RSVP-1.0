@@ -73,6 +73,9 @@ export default function PublicGameView({ gameId }: PublicGameViewProps) {
 
       if (gameError) throw gameError;
       setGame(gameData);
+      if (gameData) {
+        document.title = `Live Match Centre • ${gameData.location}`;
+      }
       await Promise.all([fetchRSVPs(), fetchVotes(), fetchMspVotes()]);
     } catch (err: any) {
       setError(err.message);
@@ -182,6 +185,16 @@ export default function PublicGameView({ gameId }: PublicGameViewProps) {
   };
 
   useEffect(() => {
+    // Dynamically enforce ⚽ favicon for Live Data Feed pages 
+    const setDynamicFavicon = () => {
+      const link = (document.querySelector("link[rel*='icon']") as HTMLLinkElement) || document.createElement('link');
+      link.type = 'image/svg+xml';
+      link.rel = 'icon';
+      link.href = `data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">⚽</text></svg>`;
+      document.getElementsByTagName('head')[0].appendChild(link);
+    };
+    setDynamicFavicon();
+
     supabase.auth.getUser().then(({ data: { user } }) => {
       setCurrentUser(user);
       if (user) {
@@ -219,7 +232,11 @@ export default function PublicGameView({ gameId }: PublicGameViewProps) {
         table: 'games',
         filter: `id=eq.${gameId}`
       }, (payload) => {
-        setGame(payload.new as Game);
+        const updatedGame = payload.new as Game;
+        setGame(updatedGame);
+        if (updatedGame) {
+          document.title = `Live Match Centre • ${updatedGame.location}`;
+        }
       })
       .subscribe();
 
@@ -504,13 +521,56 @@ const confirmed = rsvps.filter(r => r.status === 'confirmed');
                   <div className="space-y-1">
                     <p className="text-xl font-bold">
                       Hello, {currentUserProfile?.full_name || currentUser.email?.split('@')[0]}!
+                      {(() => {
+                        const myRSVP = rsvps.find(r => r.user_id === currentUser.id);
+                        if (myRSVP?.status === 'confirmed') {
+                          const idx = confirmed.findIndex(r => r.user_id === currentUser.id);
+                          if (idx !== -1) {
+                            const getOrdinal = (n: number) => {
+                              const s = ["th", "st", "nd", "rd"];
+                              const v = n % 100;
+                              return n + (s[(v - 20) % 10] || s[v] || s[0]);
+                            };
+                            return (
+                              <span className="text-pitch text-base font-black italic block sm:inline sm:ml-2">
+                                You're {getOrdinal(idx + 1)} on the list.
+                              </span>
+                            );
+                          }
+                        } else if (myRSVP?.status === 'waiting') {
+                          const idx = waiting.findIndex(r => r.user_id === currentUser.id);
+                          if (idx !== -1) {
+                            return (
+                              <span className="text-yellow-500 text-base font-black italic block sm:inline sm:ml-2">
+                                You're #{idx + 1} on the waitlist.
+                              </span>
+                            );
+                          }
+                        }
+                        return null;
+                      })()}
                     </p>
                     <p className="text-sm text-white/60">
                       {(() => {
                         const myRSVP = rsvps.find(r => r.user_id === currentUser.id);
                         if (!myRSVP) return "You haven't registered your status for this match yet.";
-                        if (myRSVP.status === 'confirmed') return "🎉 You are CONFIRMED in the squad!";
-                        if (myRSVP.status === 'waiting') return "⏳ You are currently on the WAITING list.";
+                        
+                        const getOrdinal = (n: number) => {
+                          const s = ["th", "st", "nd", "rd"];
+                          const v = n % 100;
+                          return n + (s[(v - 20) % 10] || s[v] || s[0]);
+                        };
+
+                        if (myRSVP.status === 'confirmed') {
+                          const idx = confirmed.findIndex(r => r.user_id === currentUser.id);
+                          const posText = idx !== -1 ? ` You are the ${getOrdinal(idx + 1)} player who confirmed.` : '';
+                          return `🎉 You are CONFIRMED in the squad!${posText}`;
+                        }
+                        if (myRSVP.status === 'waiting') {
+                          const idx = waiting.findIndex(r => r.user_id === currentUser.id);
+                          const posText = idx !== -1 ? ` (Position #${idx + 1})` : '';
+                          return `⏳ You are currently on the WAITING list${posText}.`;
+                        }
                         return "❌ You are listed as DECLINED (OUT).";
                       })()}
                     </p>

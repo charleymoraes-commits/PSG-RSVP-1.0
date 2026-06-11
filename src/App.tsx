@@ -25,6 +25,17 @@ export default function App() {
   const publicGameId = isPublicRoute ? path.split('/')[2] : null;
 
   useEffect(() => {
+    // Dynamically enforce ⚽ favicon globally
+    const setDynamicFavicon = () => {
+      const link = (document.querySelector("link[rel*='icon']") as HTMLLinkElement) || document.createElement('link');
+      link.type = 'image/svg+xml';
+      link.rel = 'icon';
+      link.href = `data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">⚽</text></svg>`;
+      document.getElementsByTagName('head')[0].appendChild(link);
+    };
+    setDynamicFavicon();
+    document.title = "Perth Soccer Group";
+
     if (!isSupabaseConfigured) {
       setLoading(false);
       return;
