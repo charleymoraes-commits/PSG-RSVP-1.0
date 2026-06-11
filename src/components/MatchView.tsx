@@ -4,6 +4,8 @@ import { Game, RSVP, Profile, Vote as VoteType, MSPVote } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { Users, MapPin, Clock, Trophy, Shuffle, CheckCircle2, AlertCircle, ShieldAlert, Loader2, Vote as VoteIcon, Check, RotateCw, X, Frown } from 'lucide-react';
 import { cn, formatDate, formatTime, formatRsvpTime } from '../lib/utils';
+import athleteRunningImg from '../assets/images/athlete_running_1781141095155.png';
+import athleteSittingImg from '../assets/images/athlete_sitting_1781141114349.png';
 
 interface MatchViewProps {
   user: any;
@@ -380,8 +382,8 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
           </div>
 
           {showConfirmCancel ? (
-            <div className="bg-highlight/10 border border-highlight/20 p-5 rounded-2xl w-full max-w-md space-y-4 animate-in fade-in-50 duration-200 text-center">
-              <p className="text-white text-md font-black uppercase tracking-tight">Are you sure you want to cancel your RSVP?</p>
+            <div className="bg-highlight/10 border border-highlight/20 p-6 rounded-2xl w-full max-w-md space-y-4 animate-in fade-in-50 duration-200 text-center">
+              <p className="text-white text-lg font-black uppercase tracking-tight">Are you sure you want to cancel your RSVP?</p>
               <div className="flex gap-3 justify-center">
                 <button
                   type="button"
@@ -404,25 +406,78 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
               </div>
             </div>
           ) : (
-            <div className="flex flex-col md:flex-row items-center gap-4">
-              <button
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-6 w-full max-w-3xl px-4 py-2">
+              <motion.button
+                type="button"
                 onClick={() => handleRSVP(true)}
-                disabled={actionLoading || nextGame.status !== 'open'}
+                disabled={actionLoading || nextGame.status !== 'open' || isIn}
+                whileHover={{ scale: isOut ? 1 : 1.04, y: isOut ? 0 : -4 }}
+                whileTap={{ scale: isOut ? 1 : 0.98 }}
                 className={cn(
-                  "px-10 py-5 rounded-2xl font-black text-xl transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 min-w-[240px]",
+                  "relative w-full sm:w-64 md:w-72 h-80 sm:h-96 rounded-[2.5rem] overflow-hidden group border-4 transition-all duration-500 flex flex-col justify-end text-left",
                   isIn 
-                    ? "bg-[#00ff66]/20 text-[#00ff66] border-2 border-[#00ff66]" 
-                    : "bg-[#00ff66] text-black hover:bg-[#00cc55] shadow-[0_0_20px_rgba(0,255,102,0.3)]"
+                    ? "border-[#00ff66] shadow-[0_0_35px_rgba(0,255,102,0.4)] opacity-100" 
+                    : isOut 
+                      ? "border-transparent opacity-25 grayscale cursor-not-allowed" 
+                      : "border-white/10 opacity-90 hover:opacity-100 hover:border-white/30 cursor-pointer"
                 )}
               >
-                {actionLoading ? (
-                  <Loader2 className="animate-spin" size={24} />
-                ) : (
-                  isIn ? "YOU'RE ON IT!" : "I'M IN!"
-                )}
-              </button>
+                {/* Grayscale athlete background */}
+                <img
+                  src={athleteRunningImg}
+                  alt="I'm In"
+                  referrerPolicy="no-referrer"
+                  className={cn(
+                    "absolute inset-0 w-full h-full object-cover transition-all duration-700 ease-out group-hover:scale-110",
+                    isIn ? "grayscale-0 scale-105" : "grayscale opacity-60"
+                  )}
+                />
 
-              <button
+                {/* Intense Green Tint blend overlay */}
+                <div 
+                  className={cn(
+                    "absolute inset-0 transition-all duration-500",
+                    isIn 
+                      ? "bg-emerald-500/30 mix-blend-color opacity-100" 
+                      : "bg-[#00ff66]/5 group-hover:bg-[#00ff66]/30 group-hover:mix-blend-color opacity-0 group-hover:opacity-100"
+                  )} 
+                />
+
+                {/* Ambient vignette background to make overlay text legible */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent transition-opacity duration-300" />
+
+                {/* Badge indication */}
+                {isIn && (
+                  <div className="absolute top-5 right-5 bg-[#00ff66] text-black px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-[0_0_15px_rgba(0,255,102,0.4)]">
+                    In Squad
+                  </div>
+                )}
+
+                {/* Text info and button indicator */}
+                <div className="relative p-6 z-10 w-full">
+                  <p className={cn(
+                    "text-[10px] font-black tracking-widest uppercase transition-colors duration-300",
+                    isIn ? "text-[#00ff66]" : "text-white/40 group-hover:text-white"
+                  )}>
+                    {isIn ? "Confirmed RSVP" : "Ready to play?"}
+                  </p>
+                  <h3 className="text-3xl font-black italic tracking-tighter text-white uppercase mt-1 flex items-center gap-2">
+                    {actionLoading && isIn ? (
+                      <>
+                        <Loader2 className="animate-spin" size={24} />
+                        <span>Applying...</span>
+                      </>
+                    ) : isIn ? (
+                      "YOU'RE ON IT!"
+                    ) : (
+                      "I'M IN! ⚽"
+                    )}
+                  </h3>
+                </div>
+              </motion.button>
+
+              <motion.button
+                type="button"
                 onClick={() => {
                   if (isIn) {
                     setShowConfirmCancel(true);
@@ -430,20 +485,71 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
                     handleRSVP(false);
                   }
                 }}
-                disabled={actionLoading || nextGame.status !== 'open'}
+                disabled={actionLoading || nextGame.status !== 'open' || isOut}
+                whileHover={{ scale: isIn ? 1 : 1.04, y: isIn ? 0 : -4 }}
+                whileTap={{ scale: isIn ? 1 : 0.98 }}
                 className={cn(
-                  "px-10 py-5 rounded-2xl font-black text-xl transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 min-w-[240px]",
+                  "relative w-full sm:w-64 md:w-72 h-80 sm:h-96 rounded-[2.5rem] overflow-hidden group border-4 transition-all duration-500 flex flex-col justify-end text-left",
                   isOut 
-                    ? "bg-highlight/20 text-highlight border-2 border-highlight" 
-                    : "bg-highlight text-white hover:bg-red-600 shadow-[0_0_20px_rgba(255,59,48,0.3)]"
+                    ? "border-highlight shadow-[0_0_35px_rgba(255,59,48,0.4)] opacity-100" 
+                    : isIn 
+                      ? "border-transparent opacity-25 grayscale cursor-not-allowed" 
+                      : "border-white/10 opacity-90 hover:opacity-100 hover:border-white/30 cursor-pointer"
                 )}
               >
-                {actionLoading ? (
-                  <Loader2 className="animate-spin" size={24} />
-                ) : (
-                  isOut ? "DECLINED" : "I'M OUT"
+                {/* Grayscale sitting athlete background */}
+                <img
+                  src={athleteSittingImg}
+                  alt="I'm Out"
+                  referrerPolicy="no-referrer"
+                  className={cn(
+                    "absolute inset-0 w-full h-full object-cover transition-all duration-700 ease-out group-hover:scale-110",
+                    isOut ? "grayscale-0 scale-105" : "grayscale opacity-60"
+                  )}
+                />
+
+                {/* Crimson tint overlay */}
+                <div 
+                  className={cn(
+                    "absolute inset-0 transition-all duration-500",
+                    isOut 
+                      ? "bg-red-500/30 mix-blend-color opacity-100" 
+                      : "bg-[#ff3b30]/5 group-hover:bg-[#ff3b30]/30 group-hover:mix-blend-color opacity-0 group-hover:opacity-100"
+                  )} 
+                />
+
+                {/* Ambient vignette background to make overlay text legible */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent transition-opacity duration-300" />
+
+                {/* Badge indication */}
+                {isOut && (
+                  <div className="absolute top-5 right-5 bg-highlight text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-[0_0_15px_rgba(255,59,48,0.4)]">
+                    Declined
+                  </div>
                 )}
-              </button>
+
+                {/* Text info and button indicator */}
+                <div className="relative p-6 z-10 w-full">
+                  <p className={cn(
+                    "text-[10px] font-black tracking-widest uppercase transition-colors duration-300",
+                    isOut ? "text-highlight" : "text-white/40 group-hover:text-white"
+                  )}>
+                    {isOut ? "Attending Status" : "Can't make it?"}
+                  </p>
+                  <h3 className="text-3xl font-black italic tracking-tighter text-white uppercase mt-1 flex items-center gap-2">
+                    {actionLoading && isOut ? (
+                      <>
+                        <Loader2 className="animate-spin" size={24} />
+                        <span>Applying...</span>
+                      </>
+                    ) : isOut ? (
+                      "DECLINED"
+                    ) : (
+                      "I'M OUT! ❌"
+                    )}
+                  </h3>
+                </div>
+              </motion.button>
             </div>
           )}
           <div className="mt-4 text-center">
