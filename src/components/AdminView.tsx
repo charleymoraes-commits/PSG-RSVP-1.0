@@ -15,6 +15,15 @@ export default function AdminView() {
   const [hasInitializedForm, setHasInitializedForm] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const showStatus = (type: 'success' | 'error', text: string) => {
+    setStatusMessage({ type, text });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => {
+      setStatusMessage(prev => prev?.text === text ? null : prev);
+    }, 10000); // Display for 10 seconds so the user can easily read and debug
+  };
 
   useEffect(() => {
     fetchData();
@@ -42,42 +51,55 @@ export default function AdminView() {
 
   const fetchData = async () => {
     setLoading(true);
-    const [gamesRes, profilesRes] = await Promise.all([
-      supabase.from('games').select('*').order('date', { ascending: false }),
-      supabase.from('profiles').select('*').order('full_name', { ascending: true })
-    ]);
+    try {
+      const [gamesRes, profilesRes] = await Promise.all([
+        supabase.from('games').select('*').order('date', { ascending: false }),
+        supabase.from('profiles').select('*').order('full_name', { ascending: true })
+      ]);
 
-    if (gamesRes.data) {
-      setGames(gamesRes.data);
-      
-      // Auto-prefill the creation form on initial load
-      if (!hasInitializedForm) {
-        if (gamesRes.data.length > 0) {
-          const lastGame = gamesRes.data[0];
-          setNewGameLocation(lastGame.location);
-          setNewGameTime(lastGame.time);
-          const nextDate = getNextWeekDateString(lastGame.date);
-          if (nextDate) {
-            setNewGameDate(nextDate);
+      if (gamesRes.error) {
+        showStatus('error', 'Error loading games: ' + gamesRes.error.message);
+      } else if (gamesRes.data) {
+        setGames(gamesRes.data);
+        
+        // Auto-prefill the creation form on initial load
+        if (!hasInitializedForm) {
+          if (gamesRes.data.length > 0) {
+            const lastGame = gamesRes.data[0];
+            setNewGameLocation(lastGame.location);
+            setNewGameTime(lastGame.time);
+            const nextDate = getNextWeekDateString(lastGame.date);
+            if (nextDate) {
+              setNewGameDate(nextDate);
+            }
+          } else {
+            // Defaults if no games exist
+            setNewGameLocation('Rivervale (Copley Park)');
+            setNewGameTime('18:45');
+            const today = new Date();
+            const y = today.getFullYear();
+            const m = String(today.getMonth() + 1).padStart(2, '0');
+            const d = String(today.getDate()).padStart(2, '0');
+            setNewGameDate(`${y}-${m}-${d}`);
           }
-        } else {
-          // Defaults if no games exist
-          setNewGameLocation('Rivervale (Copley Park)');
-          setNewGameTime('18:45');
-          const today = new Date();
-          const y = today.getFullYear();
-          const m = String(today.getMonth() + 1).padStart(2, '0');
-          const d = String(today.getDate()).padStart(2, '0');
-          setNewGameDate(`${y}-${m}-${d}`);
+          setHasInitializedForm(true);
         }
-        setHasInitializedForm(true);
       }
+      
+      if (profilesRes.error) {
+        showStatus('error', 'Error loading profiles: ' + profilesRes.error.message);
+      } else if (profilesRes.data) {
+        setProfiles(profilesRes.data.map((p: any) => ({
+          ...p,
+          is_approved: p.is_approved ?? true
+        })));
+      }
+    } catch (err: any) {
+      console.error('fetchData error:', err);
+      showStatus('error', 'Network/database error during fetch: ' + (err.message || err));
+    } finally {
+      setLoading(false);
     }
-    
-    if (profilesRes.data) {
-      setProfiles(profilesRes.data);
-    }
-    setLoading(false);
   };
 
   const activeGames = games.filter(g => g.status !== 'finished');
@@ -86,7 +108,7 @@ export default function AdminView() {
 
   const createGame = async (copyPrevious = false) => {
     if (activeGame) {
-      alert('Only one active game can exist at a time. Please finish or delete the current game first.');
+      showStatus('error', 'Only one active match can exist at a time. Please finish or delete the current match first.');
       return;
     }
 
@@ -104,165 +126,272 @@ export default function AdminView() {
     }
 
     if (!gameData.date) {
-      alert('Please select a date');
+      showStatus('error', 'Please select a date for the new match.');
       return;
     }
 
-    const { error } = await supabase.from('games').insert(gameData);
-    if (error) alert(error.message);
-    else fetchData();
+    try {
+      const { error } = await supabase.from('games').insert(gameData);
+      if (error) {
+        showStatus('error', 'Could not create match: ' + error.message);
+      } else {
+        showStatus('success', 'Match created successfully!');
+        fetchData();
+      }
+    } catch (err: any) {
+      showStatus('error', 'Unexpected error creating match: ' + (err.message || err));
+    }
   };
   
   const copyPublicLink = (game: Game) => {
-    // Format: [Location] [Time] [Day] [DD/MM] [Live Link]
-    const [year, month, day] = game.date.split('-').map(Number);
-    const dateObj = new Date(year, month - 1, day);
-    
-    const dayName = dateObj.toLocaleDateString('en-AU', { weekday: 'long' });
-    const dd = String(dateObj.getDate()).padStart(2, '0');
-    const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
-    
-    const cleanTime = formatTime(game.time).toLowerCase();
-    const url = `${window.location.origin}/match/${game.id}`;
-    const shareText = `${game.location} ${cleanTime} ${dayName} ${dd}/${mm} ${url}`;
+    try {
+      // Format: [Location] [Time] [Day] [DD/MM] [Live Link]
+      const [year, month, day] = game.date.split('-').map(Number);
+      const dateObj = new Date(year, month - 1, day);
+      
+      const dayName = dateObj.toLocaleDateString('en-AU', { weekday: 'long' });
+      const dd = String(dateObj.getDate()).padStart(2, '0');
+      const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+      
+      const cleanTime = formatTime(game.time).toLowerCase();
+      const url = `${window.location.origin}/match/${game.id}`;
+      const shareText = `${game.location} ${cleanTime} ${dayName} ${dd}/${mm} ${url}`;
 
-    navigator.clipboard.writeText(shareText);
-    alert('Share text copied to clipboard!\n\n' + shareText);
+      navigator.clipboard.writeText(shareText);
+      showStatus('success', 'WhatsApp share message copied to clipboard!\n\n' + shareText);
+    } catch (err: any) {
+      showStatus('error', 'Error copying link: ' + (err.message || err));
+    }
   };
 
   const toggleAdmin = async (profileId: string, currentStatus: boolean) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user?.id === profileId && currentStatus) {
-      alert("You cannot remove your own admin status to prevent lockout.");
-      return;
-    }
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.id === profileId && currentStatus) {
+        showStatus('error', 'You cannot remove your own admin status to prevent lockout.');
+        return;
+      }
 
-    const { error } = await supabase
-      .from('profiles')
-      .update({ is_admin: !currentStatus })
-      .eq('id', profileId);
-    
-    if (error) alert(error.message);
-    else {
-      setTogglingAdminId(null);
-      fetchData();
+      console.log('Toggling admin for:', profileId, 'from:', currentStatus);
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_admin: !currentStatus })
+        .eq('id', profileId);
+      
+      if (error) {
+        showStatus('error', 'Could not toggle admin: ' + error.message);
+      } else {
+        showStatus('success', 'Admin privileges updated successfully.');
+        setTogglingAdminId(null);
+        fetchData();
+      }
+    } catch (err: any) {
+      showStatus('error', 'Unexpected error: ' + (err.message || err));
     }
   };
 
   const drawTeams = async (gameId: string) => {
-    const { data: rsvps } = await supabase
-      .from('rsvps')
-      .select('*, profiles(*)')
-      .eq('game_id', gameId)
-      .eq('status', 'confirmed');
+    try {
+      const { data: rsvps, error: fetchErr } = await supabase
+        .from('rsvps')
+        .select('*, profiles(*)')
+        .eq('game_id', gameId)
+        .eq('status', 'confirmed');
 
-    if (!rsvps || rsvps.length < 2) {
-      alert('Not enough players to draw teams (min 2)');
-      return;
+      if (fetchErr) {
+        showStatus('error', 'Error fetching RSVPs: ' + fetchErr.message);
+        return;
+      }
+
+      if (!rsvps || rsvps.length < 2) {
+        showStatus('error', 'Not enough players to draw teams (minimum 2 players confirmed).');
+        return;
+      }
+
+      const playing = rsvps.map(r => r.profiles).filter(Boolean) as Profile[];
+      const shuffled = [...playing].sort(() => Math.random() - 0.5);
+      const mid = Math.ceil(shuffled.length / 2);
+      const teamA = shuffled.slice(0, mid);
+      const teamB = shuffled.slice(mid);
+
+      const { error } = await supabase
+        .from('games')
+        .update({ team_a: teamA, team_b: teamB })
+        .eq('id', gameId);
+
+      if (error) {
+        showStatus('error', 'Could not save drawn teams: ' + error.message);
+      } else {
+        showStatus('success', 'Teams drawn and saved successfully!');
+        fetchData();
+      }
+    } catch (err: any) {
+      showStatus('error', 'Unexpected error drawing teams: ' + (err.message || err));
     }
-
-    const playing = rsvps.map(r => r.profiles).filter(Boolean) as Profile[];
-    const shuffled = [...playing].sort(() => Math.random() - 0.5);
-    const mid = Math.ceil(shuffled.length / 2);
-    const teamA = shuffled.slice(0, mid);
-    const teamB = shuffled.slice(mid);
-
-    const { error } = await supabase
-      .from('games')
-      .update({ team_a: teamA, team_b: teamB })
-      .eq('id', gameId);
-
-    if (error) alert(error.message);
-    else fetchData();
   };
 
   const updateGameStatus = async (gameId: string, status: string) => {
-    let updateData: any = { status };
-    
-    if (status === 'finished') {
-      // Calculate MVP
-      const { data: votes } = await supabase
-        .from('votes')
-        .select('candidate_id')
-        .eq('game_id', gameId);
+    try {
+      let updateData: any = { status };
       
-      if (votes && votes.length > 0) {
-        const counts: Record<string, number> = {};
-        votes.forEach(v => counts[v.candidate_id] = (counts[v.candidate_id] || 0) + 1);
-        const winnerId = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
-        const winner = profiles.find(p => p.id === winnerId);
-        if (winner) updateData.mvp_winner = winner.full_name;
+      if (status === 'finished') {
+        // Safe calculative blocks
+        try {
+          // Calculate MVP
+          const { data: votes, error: votesError } = await supabase
+            .from('votes')
+            .select('candidate_id')
+            .eq('game_id', gameId);
+          
+          if (votesError) {
+            console.warn('Error fetching MVP votes on finish:', votesError.message);
+          }
+          
+          if (votes && votes.length > 0) {
+            const counts: Record<string, number> = {};
+            votes.forEach(v => {
+              if (v.candidate_id) {
+                counts[v.candidate_id] = (counts[v.candidate_id] || 0) + 1;
+              }
+            });
+            const sortedCounts = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+            if (sortedCounts.length > 0) {
+              const winnerId = sortedCounts[0][0];
+              const winner = profiles.find(p => p.id === winnerId);
+              if (winner) {
+                updateData.mvp_winner = winner.full_name;
+              }
+            }
+          }
+        } catch (mvpErr: any) {
+          console.error('Safe MVP calculation caught error:', mvpErr);
+        }
+
+        try {
+          // Calculate MSP
+          const { data: mspVotes, error: mspError } = await supabase
+            .from('msp_votes')
+            .select('candidate_id')
+            .eq('game_id', gameId);
+
+          if (mspError) {
+            console.warn('Error fetching MSP votes on finish:', mspError.message);
+          }
+
+          if (mspVotes && mspVotes.length > 0) {
+            const mspCounts: Record<string, number> = {};
+            mspVotes.forEach(v => {
+              if (v.candidate_id) {
+                mspCounts[v.candidate_id] = (mspCounts[v.candidate_id] || 0) + 1;
+              }
+            });
+            const sortedMspCounts = Object.entries(mspCounts).sort((a, b) => b[1] - a[1]);
+            if (sortedMspCounts.length > 0) {
+              const mspWinnerId = sortedMspCounts[0][0];
+              const mspWinner = profiles.find(p => p.id === mspWinnerId);
+              if (mspWinner) {
+                updateData.msp_winner = mspWinner.full_name;
+              }
+            }
+          }
+        } catch (mspErr: any) {
+          console.error('Safe MSP calculation caught error:', mspErr);
+        }
       }
 
-      // Calculate MSP
-      const { data: mspVotes } = await supabase
-        .from('msp_votes')
-        .select('candidate_id')
-        .eq('game_id', gameId);
-
-      if (mspVotes && mspVotes.length > 0) {
-        const mspCounts: Record<string, number> = {};
-        mspVotes.forEach(v => mspCounts[v.candidate_id] = (mspCounts[v.candidate_id] || 0) + 1);
-        const mspWinnerId = Object.entries(mspCounts).sort((a, b) => b[1] - a[1])[0][0];
-        const mspWinner = profiles.find(p => p.id === mspWinnerId);
-        if (mspWinner) updateData.msp_winner = mspWinner.full_name;
+      console.log('Sending games update:', updateData);
+      let { error } = await supabase.from('games').update(updateData).eq('id', gameId);
+      
+      // Fallback: If it failed due to missing msp_winner or mvp_winner column, retry without them
+      if (error && (error.message?.includes('msp_winner') || error.message?.includes('mvp_winner') || error.code === 'PGRST204')) {
+        console.log('Detected missing winner columns, retrying update with only status...');
+        const fallbackData = { status };
+        const res = await supabase.from('games').update(fallbackData).eq('id', gameId);
+        error = res.error;
       }
+
+      if (error) {
+        showStatus('error', `Could not update match status: ${error.message}`);
+      } else {
+        showStatus('success', `Match status updated successfully to ${status}!`);
+        await fetchData();
+      }
+    } catch (err: any) {
+      console.error('Fatal error in updateGameStatus:', err);
+      showStatus('error', `A critical error occurred: ${err.message || err}`);
     }
-
-    const { error } = await supabase.from('games').update(updateData).eq('id', gameId);
-    if (error) alert(error.message);
-    else fetchData();
   };
 
   const copyMVPPoll = (game: Game) => {
-    const appUrl = window.location.origin;
-    const pollText = `🏆 *MVP VOTING: ${game.date}*\n\nVote for the best player of the match here:\n${appUrl}\n\n_Only confirmed players can vote!_`;
-    
-    navigator.clipboard.writeText(pollText);
-    alert('Voting link copied to clipboard! Paste it in WhatsApp.');
+    try {
+      const appUrl = window.location.origin;
+      const pollText = `🏆 *MVP VOTING: ${game.date}*\n\nVote for the best player of the match here:\n${appUrl}\n\n_Only confirmed players can vote!_`;
+      
+      navigator.clipboard.writeText(pollText);
+      showStatus('success', 'MVP voting WhatsApp poll template copied to clipboard!');
+    } catch (err: any) {
+      showStatus('error', 'Error copying MVP poll template: ' + (err.message || err));
+    }
   };
 
   const deleteGame = async (gameId: string) => {
-    const { error } = await supabase.from('games').delete().eq('id', gameId);
-    if (error) alert(error.message);
-    else {
-      setDeletingGameId(null);
-      fetchData();
+    try {
+      const { error } = await supabase.from('games').delete().eq('id', gameId);
+      if (error) {
+        showStatus('error', 'Could not delete match: ' + error.message);
+      } else {
+        showStatus('success', 'Match deleted successfully.');
+        setDeletingGameId(null);
+        fetchData();
+      }
+    } catch (err: any) {
+      showStatus('error', 'Unexpected error deleting match: ' + (err.message || err));
     }
   };
 
   const approveUser = async (profileId: string) => {
     setApprovingId(profileId);
-    const { error } = await supabase
-      .from('profiles')
-      .update({ is_approved: true })
-      .eq('id', profileId);
-    
-    if (error) {
-      alert(`Error: ${error.message}`);
-    } else {
-      // Update local state immediately for better UX
-      setProfiles(prev => prev.map(p => p.id === profileId ? { ...p, is_approved: true } : p));
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_approved: true })
+        .eq('id', profileId);
+      
+      if (error) {
+        showStatus('error', `Could not approve player: ${error.message}`);
+      } else {
+        showStatus('success', 'Player approved successfully.');
+        setProfiles(prev => prev.map(p => p.id === profileId ? { ...p, is_approved: true } : p));
+      }
+    } catch (err: any) {
+      showStatus('error', 'Unexpected error approving player: ' + (err.message || err));
+    } finally {
+      setApprovingId(null);
     }
-    setApprovingId(null);
   };
 
   const revokeAccess = async (profileId: string) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user?.id === profileId) {
-      alert("You cannot revoke your own access.");
-      return;
-    }
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.id === profileId) {
+        showStatus('error', 'You cannot revoke your own admin access privileges.');
+        return;
+      }
 
-    const { error } = await supabase
-      .from('profiles')
-      .update({ is_approved: false })
-      .eq('id', profileId);
-    
-    if (error) alert(error.message);
-    else {
-      setDeletingProfileId(null);
-      fetchData();
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_approved: false })
+        .eq('id', profileId);
+      
+      if (error) {
+        showStatus('error', 'Could not revoke access: ' + error.message);
+      } else {
+        showStatus('success', 'Player access revoked successfully.');
+        setDeletingProfileId(null);
+        fetchData();
+      }
+    } catch (err: any) {
+      showStatus('error', 'Unexpected error revoking access: ' + (err.message || err));
     }
   };
 
@@ -274,6 +403,24 @@ export default function AdminView() {
         <h1 className="text-5xl font-black tracking-tighter text-pitch italic">ADMIN PANEL</h1>
         <p className="text-white/40 font-bold uppercase tracking-widest text-xs">Manage games, players and polls.</p>
       </div>
+
+      {statusMessage && (
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={cn(
+            "p-4 rounded-xl border flex items-start gap-3",
+            statusMessage.type === 'error' 
+              ? "bg-red-500/10 border-red-500/20 text-red-400" 
+              : "bg-[#00ff66]/10 border-[#00ff66]/20 text-[#00ff66]"
+          )}
+        >
+          <div className="flex-1 text-sm font-bold whitespace-pre-line">{statusMessage.text}</div>
+          <button onClick={() => setStatusMessage(null)} className="text-white/40 hover:text-white transition-colors">
+            <X size={16} />
+          </button>
+        </motion.div>
+      )}
 
       {/* Create Game */}
       <section className="space-y-6">

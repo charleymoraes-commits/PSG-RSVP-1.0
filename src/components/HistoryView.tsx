@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Game, Profile, Vote } from '../types';
 import { motion } from 'motion/react';
-import { Trophy, Calendar, Users, Award, MapPin } from 'lucide-react';
+import { Trophy, Calendar, Users, Award, MapPin, X } from 'lucide-react';
 import { formatDate } from '../lib/utils';
 
 interface HistoryViewProps {
@@ -15,6 +15,15 @@ export default function HistoryView({ user }: HistoryViewProps) {
   const [votingFor, setVotingFor] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<Profile[]>([]);
   const [myVotes, setMyVotes] = useState<Record<string, string>>({});
+  const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const showStatus = (type: 'success' | 'error', text: string) => {
+    setStatusMessage({ type, text });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => {
+      setStatusMessage(prev => prev?.text === text ? null : prev);
+    }, 8000);
+  };
 
   useEffect(() => {
     fetchHistory();
@@ -54,17 +63,22 @@ export default function HistoryView({ user }: HistoryViewProps) {
 
   const castVote = async (gameId: string, candidateId: string) => {
     if (!user) return;
-    const { error } = await supabase.from('votes').insert({
-      game_id: gameId,
-      voter_id: user.id,
-      candidate_id: candidateId
-    });
+    try {
+      const { error } = await supabase.from('votes').insert({
+        game_id: gameId,
+        voter_id: user.id,
+        candidate_id: candidateId
+      });
 
-    if (error) {
-      alert('Error casting vote: ' + error.message);
-    } else {
-      setMyVotes({ ...myVotes, [gameId]: candidateId });
-      setVotingFor(null);
+      if (error) {
+        showStatus('error', 'Error casting vote: ' + error.message);
+      } else {
+        showStatus('success', 'Thank you! Your vote for the match MVP has been recorded.');
+        setMyVotes({ ...myVotes, [gameId]: candidateId });
+        setVotingFor(null);
+      }
+    } catch (err: any) {
+      showStatus('error', 'Unexpected error casting vote: ' + (err.message || err));
     }
   };
 
@@ -72,6 +86,23 @@ export default function HistoryView({ user }: HistoryViewProps) {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
+      {statusMessage && (
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={`p-4 rounded-xl border flex items-start gap-3 ${
+            statusMessage.type === 'error' 
+              ? "bg-red-500/10 border-red-500/20 text-red-400" 
+              : "bg-[#00ff66]/10 border-[#00ff66]/20 text-[#00ff66]"
+          }`}
+        >
+          <div className="flex-1 text-sm font-bold whitespace-pre-line">{statusMessage.text}</div>
+          <button onClick={() => setStatusMessage(null)} className="text-white/40 hover:text-white transition-colors">
+            <X size={16} />
+          </button>
+        </motion.div>
+      )}
+
       <div className="space-y-4">
         <h1 className="text-5xl font-black tracking-tighter italic text-white">MATCH HISTORY</h1>
         <p className="text-white/40 font-bold uppercase tracking-widest text-xs">Relive the glory and vote for your MVPs.</p>

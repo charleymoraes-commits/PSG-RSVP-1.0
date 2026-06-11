@@ -16,6 +16,44 @@ interface Vote {
   candidate_id: string;
 }
 
+const MVP_PHRASES = [
+  "carried the entire team on their back tonight. 💪🏆",
+  "Absolute masterclass from start to finish. ✨⚽️",
+  "The undisputed king of the pitch tonight. 👑🔥",
+  "Turned the game into their own personal highlight reel. 📹🌟",
+  "Pure class in every single touch. 🪄👌",
+  "They aren't just playing the game, they're running it. ⚙️🧠",
+  "Unstoppable force from the first whistle to the last. ⚡️🏃‍♂️",
+  "Made a difficult game look effortlessly easy. 😎🎖️",
+  "The definition of a game-changer tonight. 💥🚀",
+  "Give them the trophy already, no contest. 🥇🤝"
+];
+
+const MSP_PHRASES = [
+  "Played like they forgot which sport we were playing. 😅🏌️‍♂️",
+  "An absolute disasterclass from start to finish. 🤦‍♂️📉",
+  "The opposition’s best defender was actually on our team. 🙄🛑",
+  "Spent more time on the grass than the ball did. 🌱🛌",
+  "A walking, talking turnover machine tonight. 🔄🎭",
+  "They’d have trouble finding the back of the net in an empty stadium. 🥅💨",
+  "Running around like a headless chicken out there. 🐔💨",
+  "Pretty sure they were playing for the wrong team. 🤔👐",
+  "If missing passes was an art form, they'd be Picasso. 🎨🤦",
+  "The only thing they successfully defended tonight was their own shadow. 👤🛡️"
+];
+
+const getStablePhrase = (phrases: string[], playerId: string, gameId: string) => {
+  if (!playerId) return phrases[0];
+  const combinedStr = `${gameId}-${playerId}`;
+  let hash = 0;
+  for (let i = 0; i < combinedStr.length; i++) {
+    hash = (hash << 5) - hash + combinedStr.charCodeAt(i);
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  const idx = Math.abs(hash) % phrases.length;
+  return phrases[idx];
+};
+
 export default function PublicGameView({ gameId }: PublicGameViewProps) {
   const [game, setGame] = useState<Game | null>(null);
   const [rsvps, setRsvps] = useState<RSVP[]>([]);
@@ -26,6 +64,7 @@ export default function PublicGameView({ gameId }: PublicGameViewProps) {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [currentUserProfile, setCurrentUserProfile] = useState<Profile | null>(null);
   const [rsvpMessage, setRsvpMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [voteMessage, setVoteMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [showConfirmCancel, setShowConfirmCancel] = useState(false);
 
@@ -273,34 +312,35 @@ export default function PublicGameView({ gameId }: PublicGameViewProps) {
   }, [gameId]);
 
   const handleVote = async (candidateId: string) => {
+    setVoteMessage(null);
     if (!currentUser) {
-      alert('Please log in to cast your vote!');
+      setVoteMessage({ type: 'error', text: 'Please log in to cast your vote!' });
       window.location.href = '/';
       return;
     }
 
     if (game?.status !== 'voting') {
-      alert('Voting is not open yet!');
+      setVoteMessage({ type: 'error', text: 'Voting is not open yet!' });
       return;
     }
 
     // Eligibility check: Only confirmed players can vote
     const isPlayerConfirmed = confirmed.some(r => r.user_id === currentUser.id);
     if (!isPlayerConfirmed) {
-      alert('Only players confirmed for this match can vote!');
+      setVoteMessage({ type: 'error', text: 'Only players confirmed for this match can vote!' });
       return;
     }
 
     // Cannot vote for self
     if (candidateId === currentUser.id) {
-      alert('You cannot vote for yourself!');
+      setVoteMessage({ type: 'error', text: 'You cannot vote for yourself!' });
       return;
     }
 
     // Cannot vote for same candidate as MSP
     const myMspVote = mspVotes.find(v => v.voter_id === currentUser.id);
     if (myMspVote && myMspVote.candidate_id === candidateId) {
-      alert('You cannot vote for your MSP choice as MVP!');
+      setVoteMessage({ type: 'error', text: 'You cannot vote for your MSP choice as MVP!' });
       return;
     }
 
@@ -312,42 +352,44 @@ export default function PublicGameView({ gameId }: PublicGameViewProps) {
         candidate_id: candidateId
       });
       if (error) throw error;
+      setVoteMessage({ type: 'success', text: 'MVP vote cast successfully!' });
       fetchVotes();
+      setTimeout(() => setVoteMessage(null), 5000);
     } catch (err: any) {
-      alert(err.code === '23505' ? 'You have already voted!' : err.message);
+      setVoteMessage({ 
+        type: 'error', 
+        text: err.code === '23505' ? 'You have already voted!' : err.message 
+      });
+      setTimeout(() => setVoteMessage(null), 5000);
     } finally {
       setActionLoading(false);
     }
   };
 
   const handleMspVote = async (candidateId: string) => {
+    setVoteMessage(null);
     if (!currentUser) {
-      alert('Please log in to cast your vote!');
+      setVoteMessage({ type: 'error', text: 'Please log in to cast your vote!' });
       window.location.href = '/';
       return;
     }
 
     if (game?.status !== 'voting') {
-      alert('Voting is not open yet!');
+      setVoteMessage({ type: 'error', text: 'Voting is not open yet!' });
       return;
     }
 
     // Eligibility check: Only confirmed players can vote
     const isPlayerConfirmed = confirmed.some(r => r.user_id === currentUser.id);
     if (!isPlayerConfirmed) {
-      alert('Only players confirmed for this match can vote!');
-      return;
-    }
-
-    // Cannot vote for self
-    if (candidateId === currentUser.id) {
-      alert('You cannot vote for yourself!');
+      setVoteMessage({ type: 'error', text: 'Only players confirmed for this match can vote!' });
       return;
     }
 
     // Cannot vote for same candidate as MVP
+    const myVote = votes.find(v => v.voter_id === currentUser?.id);
     if (myVote && myVote.candidate_id === candidateId) {
-      alert('You cannot vote for your MVP choice as the Most Shitty Player!');
+      setVoteMessage({ type: 'error', text: 'You cannot vote for your MVP choice as the Most Shitty Player!' });
       return;
     }
 
@@ -359,9 +401,15 @@ export default function PublicGameView({ gameId }: PublicGameViewProps) {
         candidate_id: candidateId
       });
       if (error) throw error;
+      setVoteMessage({ type: 'success', text: 'MSP vote cast successfully!' });
       fetchMspVotes();
+      setTimeout(() => setVoteMessage(null), 5000);
     } catch (err: any) {
-      alert(err.code === '23505' ? 'You have already voted for MSP!' : err.message);
+      setVoteMessage({ 
+        type: 'error', 
+        text: err.code === '23505' ? 'You have already voted for MSP!' : err.message 
+      });
+      setTimeout(() => setVoteMessage(null), 5000);
     } finally {
       setActionLoading(false);
     }
@@ -396,6 +444,24 @@ const confirmed = rsvps.filter(r => r.status === 'confirmed');
   const maxVotes = Math.max(...confirmed.map(p => getVoteCount(p.user_id)), 1);
 
   const getMspVoteCount = (playerId: string) => mspVotes.filter(v => v.candidate_id === playerId).length;
+
+  // Find overall MVP Winner(s)
+  const mvpWinners = (() => {
+    if (confirmed.length === 0 || votes.length === 0) return [];
+    const counts = confirmed.map(p => ({ player: p, count: getVoteCount(p.user_id) }));
+    const max = Math.max(...counts.map(c => c.count));
+    if (max === 0) return [];
+    return counts.filter(c => c.count === max).map(c => c.player);
+  })();
+
+  // Find overall MSP Winner(s)
+  const mspWinners = (() => {
+    if (confirmed.length === 0 || mspVotes.length === 0) return [];
+    const counts = confirmed.map(p => ({ player: p, count: getMspVoteCount(p.user_id) }));
+    const max = Math.max(...counts.map(c => c.count));
+    if (max === 0) return [];
+    return counts.filter(c => c.count === max).map(c => c.player);
+  })();
 
   return (
     <div className="min-h-screen bg-black text-white font-sans selection:bg-white selection:text-black">
@@ -693,6 +759,21 @@ const confirmed = rsvps.filter(r => r.status === 'confirmed');
               exit={{ opacity: 0, y: -20 }}
               className="space-y-12"
             >
+              {voteMessage && (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className={cn(
+                    "p-4 rounded-xl text-xs font-black tracking-wider uppercase border text-center",
+                    voteMessage.type === 'success' 
+                      ? "bg-[#00ff66]/10 border-[#00ff66]/20 text-[#00ff66] shadow-[0_0_15px_rgba(0,255,102,0.1)]" 
+                      : "bg-[#ff3b30]/10 border-[#ff3b30]/20 text-[#ff3b30] shadow-[0_0_15px_rgba(255,59,48,0.1)]"
+                  )}
+                >
+                  {voteMessage.text}
+                </motion.div>
+              )}
+
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* MVP Section */}
                 <div className="space-y-6">
@@ -705,6 +786,24 @@ const confirmed = rsvps.filter(r => r.status === 'confirmed');
                       {votes.length} Total Votes
                     </div>
                   </div>
+
+                  {/* If finished: display a beautiful MVP winner banner */}
+                  {game.status === 'finished' && mvpWinners.length > 0 && (
+                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-5 mb-4 relative overflow-hidden">
+                      <div className="absolute top-2 right-2 opacity-10 text-blue-500">
+                        <Trophy size={80} />
+                      </div>
+                      <p className="text-xs uppercase font-black tracking-widest text-blue-400 mb-1 flex items-center gap-1.5">
+                        🏆 MVP: MOST VALUABLE PLAYER
+                      </p>
+                      <h4 className="text-xl font-black italic tracking-tight text-white uppercase flex items-center gap-2">
+                        {mvpWinners.map(w => w.profiles?.full_name || 'Unknown Player').join(' & ')}
+                      </h4>
+                      <p className="text-xs font-bold mt-2 text-white/80 leading-relaxed max-w-md">
+                        {getStablePhrase(MVP_PHRASES, mvpWinners[0]?.user_id || '', game.id)}
+                      </p>
+                    </div>
+                  )}
 
                   <div className="space-y-3">
                     {confirmed
@@ -776,6 +875,24 @@ const confirmed = rsvps.filter(r => r.status === 'confirmed');
                     </div>
                   </div>
 
+                  {/* If finished: display a beautiful MSP winner banner */}
+                  {game.status === 'finished' && mspWinners.length > 0 && (
+                    <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-5 mb-4 relative overflow-hidden">
+                      <div className="absolute top-2 right-2 opacity-10 text-red-500">
+                        <Frown size={80} />
+                      </div>
+                      <p className="text-xs uppercase font-black tracking-widest text-red-400 mb-1 flex items-center gap-1.5">
+                        🚽 MSP: MOST SHITTY PLAYER
+                      </p>
+                      <h4 className="text-xl font-black italic tracking-tight text-white uppercase flex items-center gap-2">
+                        {mspWinners.map(w => w.profiles?.full_name || 'Unknown Player').join(' & ')}
+                      </h4>
+                      <p className="text-xs font-bold mt-2 text-white/80 leading-relaxed max-w-md">
+                        {getStablePhrase(MSP_PHRASES, mspWinners[0]?.user_id || '', game.id)}
+                      </p>
+                    </div>
+                  )}
+
                   <div className="space-y-3">
                     {confirmed
                       .sort((a, b) => getMspVoteCount(b.user_id) - getMspVoteCount(a.user_id))
@@ -785,7 +902,7 @@ const confirmed = rsvps.filter(r => r.status === 'confirmed');
                         const isVotedByMe = myMspVote?.candidate_id === player.user_id;
                         const isSelfCandidate = player.user_id === currentUser?.id;
                         const isMvpCandidate = myVote?.candidate_id === player.user_id;
-                        const canCastMspVote = game.status === 'voting' && !myMspVote && currentUser && !isSelfCandidate && !isMvpCandidate;
+                        const canCastMspVote = game.status === 'voting' && !myMspVote && currentUser && !isMvpCandidate;
 
                         const maxMspVotes = Math.max(...confirmed.map(p => getMspVoteCount(p.user_id)), 1);
 

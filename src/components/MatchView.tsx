@@ -268,12 +268,6 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
       return;
     }
 
-    // Restriction: Cannot vote for self
-    if (candidateId === user.id) {
-      setError('You cannot vote for yourself!');
-      return;
-    }
-
     // Restriction: Cannot vote for same user as MVP
     if (myVote && myVote.candidate_id === candidateId) {
       setError('You cannot vote for your MVP choice as the Most Shitty Player!');
@@ -323,6 +317,7 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
   const myRSVP = rsvps.find(r => r.user_id === user?.id);
   const isIn = myRSVP && (myRSVP.status === 'confirmed' || myRSVP.status === 'waiting');
   const isOut = myRSVP && myRSVP.status === 'declined';
+  const isClosed = nextGame.status !== 'open';
   const myVote = votes.find(v => v.voter_id === user?.id);
   const myMspVote = mspVotes.find(v => v.voter_id === user?.id);
 
@@ -334,8 +329,196 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
     return mspVotes.filter(v => v.candidate_id === playerId).length;
   };
 
+  const votingCandidates = ((nextGame.team_a && nextGame.team_a.length > 0) || (nextGame.team_b && nextGame.team_b.length > 0))
+    ? [...(nextGame.team_a || []), ...(nextGame.team_b || [])]
+    : confirmed.map(r => r.profiles || { id: r.user_id, full_name: `Player (${r.user_id.slice(0, 5)})`, is_admin: false, is_approved: true, created_at: '' });
+
   return (
     <div className="space-y-8 max-w-4xl mx-auto">
+      {/* MVP/MSP Voting Section at the very top if voting is active */}
+      {nextGame.status === 'voting' && (
+        <div className="space-y-8 animate-in fade-in-50 slide-in-from-top-4 duration-300">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="glass-card p-8 border-2 border-blue-500/30 space-y-8"
+          >
+            <div className="text-center space-y-2">
+              <h2 className="text-3xl font-black italic tracking-tighter flex items-center justify-center gap-3 text-blue-500">
+                <VoteIcon size={32} /> WHO WAS THE BEST ON PITCH?
+              </h2>
+              <p className="text-white/40 text-sm font-bold uppercase tracking-widest">
+                Live Poll Results • Can't vote for yourself or your MSP candidate!
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {votingCandidates.map(player => {
+                const voteCount = getVoteCount(player.id);
+                const isVotedByMe = myVote?.candidate_id === player.id;
+                const isMe = player.id === user?.id;
+                const isMyMspChoice = myMspVote?.candidate_id === player.id;
+                const isDisabled = actionLoading || !!myVote || isMe || isMyMspChoice;
+
+                return (
+                  <button
+                    key={player.id}
+                    onClick={() => handleVote(player.id)}
+                    disabled={isDisabled}
+                    className={cn(
+                      "relative group flex items-center justify-between p-4 rounded-2xl border transition-all overflow-hidden text-left",
+                      isVotedByMe 
+                        ? "bg-white text-black border-white shadow-[0_0_20px_rgba(255,255,255,0.5)]" 
+                        : isMyMspChoice 
+                          ? "bg-white/5 border-white/5 opacity-30 cursor-not-allowed"
+                          : "bg-white/5 border-white/10 hover:border-blue-500/50 hover:bg-white/10",
+                      isDisabled && !isVotedByMe && "opacity-50 cursor-not-allowed"
+                    )}
+                  >
+                    {/* Progress Bar Background */}
+                    {votes.length > 0 && (
+                      <div 
+                        className="absolute inset-0 bg-blue-500/10 transition-all duration-1000 animate-pulse" 
+                        style={{ width: `${(voteCount / votes.length) * 100}%` }}
+                      />
+                    )}
+
+                    <div className="relative flex items-center gap-3 z-10">
+                      <div className={cn(
+                        "w-8 h-8 rounded-full flex items-center justify-center text-xs font-black",
+                        isVotedByMe ? "bg-blue-500 text-white" : "bg-white/10 text-white/40"
+                      )}>
+                        {isVotedByMe ? <Check size={16} /> : voteCount}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="font-bold tracking-tight">{player.full_name}</span>
+                        <div className="flex gap-1.5 mt-0.5">
+                          {isMe && <span className="text-[10px] uppercase bg-white/10 px-2 py-0.5 rounded text-white/40">You</span>}
+                          {isMyMspChoice && <span className="text-[9px] uppercase bg-red-500/10 px-2   py-0.5 rounded text-red-500 font-extrabold border border-red-500/20">Your MSP choice</span>}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="relative text-xs font-black uppercase tracking-widest opacity-40 group-hover:opacity-100 transition-opacity z-10">
+                      {isVotedByMe ? "Your Vote" : `${voteCount} ${voteCount === 1 ? 'Vote' : 'Votes'}`}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {myVote && (
+              <div className="text-center">
+                <p className="text-blue-400 text-sm font-bold flex items-center justify-center gap-2">
+                  <CheckCircle2 size={16} /> You have cast your MVP vote!
+                </p>
+              </div>
+            )}
+            
+            {error && (
+              <div className="mt-4 text-center">
+                <p className="text-highlight text-xs font-bold bg-highlight/10 px-3 py-1 rounded border border-highlight/20 inline-block">{error}</p>
+              </div>
+            )}
+            {success && (
+              <div className="mt-4 text-center">
+                <p className="text-[#00ff66] text-xs font-bold bg-[#00ff66]/10 px-3 py-1 rounded border border-[#00ff66]/20 inline-block">{success}</p>
+              </div>
+            )}
+          </motion.div>
+
+          {/* MSP Voting Section */}
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="glass-card p-8 border-2 border-red-500/30 space-y-8"
+          >
+            <div className="text-center space-y-2">
+              <h2 className="text-3xl font-black italic tracking-tighter flex items-center justify-center gap-3 text-red-500">
+                <Frown size={32} /> WHO WAS THE MOST SHITTY ON PITCH? (MSP)
+              </h2>
+              <p className="text-white/40 text-sm font-bold uppercase tracking-widest leading-relaxed">
+                Live Poll Results • Can't vote for your MVP candidate! (Self-voting is allowed)
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {votingCandidates.map(player => {
+                const voteCount = getMspVoteCount(player.id);
+                const isVotedByMe = myMspVote?.candidate_id === player.id;
+                const isMe = player.id === user?.id;
+                const isMyMvpChoice = myVote?.candidate_id === player.id;
+                const isDisabled = actionLoading || !!myMspVote || isMyMvpChoice;
+
+                return (
+                  <button
+                    key={player.id}
+                    onClick={() => handleMspVote(player.id)}
+                    disabled={isDisabled}
+                    className={cn(
+                      "relative group flex items-center justify-between p-4 rounded-2xl border transition-all overflow-hidden text-left",
+                      isVotedByMe 
+                        ? "bg-white text-black border-white shadow-[0_0_20px_rgba(239,68,68,0.5)]" 
+                        : isMyMvpChoice 
+                          ? "bg-white/5 border-white/5 opacity-30 cursor-not-allowed"
+                          : "bg-white/5 border-white/10 hover:border-red-500/50 hover:bg-white/10",
+                      isDisabled && !isVotedByMe && "opacity-50 cursor-not-allowed"
+                    )}
+                  >
+                    {/* Progress Bar Background */}
+                    {mspVotes.length > 0 && (
+                      <div 
+                        className="absolute inset-0 bg-red-500/10 transition-all duration-1000 animate-pulse" 
+                        style={{ width: `${(voteCount / mspVotes.length) * 100}%` }}
+                      />
+                    )}
+
+                    <div className="relative flex items-center gap-3 z-10">
+                      <div className={cn(
+                        "w-8 h-8 rounded-full flex items-center justify-center text-xs font-black",
+                        isVotedByMe ? "bg-red-500 text-white" : "bg-white/10 text-white/40"
+                      )}>
+                        {isVotedByMe ? <Check size={16} /> : voteCount}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="font-bold tracking-tight">{player.full_name}</span>
+                        <div className="flex gap-1.5 mt-0.5">
+                          {isMe && <span className="text-[10px] uppercase bg-white/10 px-2 py-0.5 rounded text-white/40">You</span>}
+                          {isMyMvpChoice && <span className="text-[9px] uppercase bg-blue-500/10 px-2 py-0.5 rounded text-blue-400 font-extrabold border border-blue-500/20">Your MVP choice</span>}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="relative text-xs font-black uppercase tracking-widest opacity-40 group-hover:opacity-100 transition-opacity z-10">
+                      {isVotedByMe ? "Your Vote" : `${voteCount} ${voteCount === 1 ? 'Vote' : 'Votes'}`}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {myMspVote && (
+              <div className="text-center">
+                <p className="text-red-400 text-sm font-bold flex items-center justify-center gap-2">
+                  <CheckCircle2 size={16} /> You have cast your MSP vote!
+                </p>
+              </div>
+            )}
+            
+            {error && (
+              <div className="mt-4 text-center">
+                <p className="text-highlight text-xs font-bold bg-highlight/10 px-3 py-1 rounded border border-highlight/20 inline-block">{error}</p>
+              </div>
+            )}
+            {success && (
+              <div className="mt-4 text-center">
+                <p className="text-[#00ff66] text-xs font-bold bg-[#00ff66]/10 px-3 py-1 rounded border border-[#00ff66]/20 inline-block">{success}</p>
+              </div>
+            )}
+          </motion.div>
+        </div>
+      )}
+
       {/* Game Header */}
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
@@ -410,16 +593,20 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
               <motion.button
                 type="button"
                 onClick={() => handleRSVP(true)}
-                disabled={actionLoading || nextGame.status !== 'open' || isIn}
-                whileHover={{ scale: isOut ? 1 : 1.04, y: isOut ? 0 : -4 }}
-                whileTap={{ scale: isOut ? 1 : 0.98 }}
+                disabled={actionLoading || isClosed || isIn}
+                whileHover={isClosed ? {} : { scale: isOut ? 1 : 1.04, y: isOut ? 0 : -4 }}
+                whileTap={isClosed ? {} : { scale: isOut ? 1 : 0.98 }}
                 className={cn(
                   "relative w-full sm:w-64 md:w-72 h-80 sm:h-96 rounded-[2.5rem] overflow-hidden group border-4 transition-all duration-500 flex flex-col justify-end text-left",
-                  isIn 
-                    ? "border-[#00ff66] shadow-[0_0_35px_rgba(0,255,102,0.4)] opacity-100" 
-                    : isOut 
-                      ? "border-transparent opacity-25 grayscale cursor-not-allowed" 
-                      : "border-white/10 opacity-90 hover:opacity-100 hover:border-white/30 cursor-pointer"
+                  isClosed
+                    ? (isIn 
+                        ? "border-white/20 shadow-none opacity-50 grayscale cursor-not-allowed" 
+                        : "border-transparent opacity-20 grayscale cursor-not-allowed")
+                    : (isIn 
+                        ? "border-[#00ff66] shadow-[0_0_35px_rgba(0,255,102,0.4)] opacity-100" 
+                        : isOut 
+                          ? "border-transparent opacity-25 grayscale cursor-not-allowed" 
+                          : "border-white/10 opacity-90 hover:opacity-100 hover:border-white/30 cursor-pointer")
                 )}
               >
                 {/* Grayscale athlete background */}
@@ -428,8 +615,8 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
                   alt="I'm In"
                   referrerPolicy="no-referrer"
                   className={cn(
-                    "absolute inset-0 w-full h-full object-cover transition-all duration-700 ease-out group-hover:scale-110",
-                    isIn ? "grayscale-0 scale-105" : "grayscale opacity-60"
+                    "absolute inset-0 w-full h-full object-cover transition-all duration-700 ease-out",
+                    !isClosed && isIn ? "grayscale-0 scale-105" : "grayscale opacity-50"
                   )}
                 />
 
@@ -437,9 +624,9 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
                 <div 
                   className={cn(
                     "absolute inset-0 transition-all duration-500",
-                    isIn 
+                    !isClosed && isIn 
                       ? "bg-emerald-500/30 mix-blend-color opacity-100" 
-                      : "bg-[#00ff66]/5 group-hover:bg-[#00ff66]/30 group-hover:mix-blend-color opacity-0 group-hover:opacity-100"
+                      : !isClosed ? "bg-[#00ff66]/5 group-hover:bg-[#00ff66]/30 group-hover:mix-blend-color opacity-0 group-hover:opacity-100" : "opacity-0"
                   )} 
                 />
 
@@ -448,7 +635,12 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
 
                 {/* Badge indication */}
                 {isIn && (
-                  <div className="absolute top-5 right-5 bg-[#00ff66] text-black px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-[0_0_15px_rgba(0,255,102,0.4)]">
+                  <div className={cn(
+                    "absolute top-5 right-5 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest",
+                    isClosed
+                      ? "bg-white/10 text-white/50 border border-white/10 shadow-none"
+                      : "bg-[#00ff66] text-black shadow-[0_0_15px_rgba(0,255,102,0.4)]"
+                  )}>
                     In Squad
                   </div>
                 )}
@@ -505,16 +697,20 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
                     handleRSVP(false);
                   }
                 }}
-                disabled={actionLoading || nextGame.status !== 'open' || isOut}
-                whileHover={{ scale: isIn ? 1 : 1.04, y: isIn ? 0 : -4 }}
-                whileTap={{ scale: isIn ? 1 : 0.98 }}
+                disabled={actionLoading || isClosed || isOut}
+                whileHover={isClosed ? {} : { scale: isIn ? 1 : 1.04, y: isIn ? 0 : -4 }}
+                whileTap={isClosed ? {} : { scale: isIn ? 1 : 0.98 }}
                 className={cn(
                   "relative w-full sm:w-64 md:w-72 h-80 sm:h-96 rounded-[2.5rem] overflow-hidden group border-4 transition-all duration-500 flex flex-col justify-end text-left",
-                  isOut 
-                    ? "border-highlight shadow-[0_0_35px_rgba(255,59,48,0.4)] opacity-100" 
-                    : isIn 
-                      ? "border-transparent opacity-25 grayscale cursor-not-allowed" 
-                      : "border-white/10 opacity-90 hover:opacity-100 hover:border-white/30 cursor-pointer"
+                  isClosed
+                    ? (isOut 
+                        ? "border-white/20 shadow-none opacity-50 grayscale cursor-not-allowed" 
+                        : "border-transparent opacity-20 grayscale cursor-not-allowed")
+                    : (isOut 
+                        ? "border-highlight shadow-[0_0_35px_rgba(255,59,48,0.4)] opacity-100" 
+                        : isIn 
+                          ? "border-transparent opacity-25 grayscale cursor-not-allowed" 
+                          : "border-white/10 opacity-90 hover:opacity-100 hover:border-white/30 cursor-pointer")
                 )}
               >
                 {/* Grayscale sitting athlete background */}
@@ -523,8 +719,8 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
                   alt="I'm Out"
                   referrerPolicy="no-referrer"
                   className={cn(
-                    "absolute inset-0 w-full h-full object-cover transition-all duration-700 ease-out group-hover:scale-110",
-                    isOut ? "grayscale-0 scale-105" : "grayscale opacity-60"
+                    "absolute inset-0 w-full h-full object-cover transition-all duration-700 ease-out",
+                    !isClosed && isOut ? "grayscale-0 scale-105" : "grayscale opacity-50"
                   )}
                 />
 
@@ -532,9 +728,9 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
                 <div 
                   className={cn(
                     "absolute inset-0 transition-all duration-500",
-                    isOut 
+                    !isClosed && isOut 
                       ? "bg-red-500/30 mix-blend-color opacity-100" 
-                      : "bg-[#ff3b30]/5 group-hover:bg-[#ff3b30]/30 group-hover:mix-blend-color opacity-0 group-hover:opacity-100"
+                      : !isClosed ? "bg-[#ff3b30]/5 group-hover:bg-[#ff3b30]/30 group-hover:mix-blend-color opacity-0 group-hover:opacity-100" : "opacity-0"
                   )} 
                 />
 
@@ -543,7 +739,12 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
 
                 {/* Badge indication */}
                 {isOut && (
-                  <div className="absolute top-5 right-5 bg-highlight text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-[0_0_15px_rgba(255,59,48,0.4)]">
+                  <div className={cn(
+                    "absolute top-5 right-5 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest",
+                    isClosed
+                      ? "bg-white/10 text-white/50 border border-white/10 shadow-none"
+                      : "bg-highlight text-white shadow-[0_0_15px_rgba(255,59,48,0.4)]"
+                  )}>
                     Declined
                   </div>
                 )}
@@ -552,7 +753,7 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
                 <div className="relative p-6 z-10 w-full">
                   <p className={cn(
                     "text-[10px] font-black tracking-widest uppercase transition-colors duration-300",
-                    isOut ? "text-highlight" : "text-white/40 group-hover:text-white"
+                    !isClosed && isOut ? "text-highlight" : "text-white/40"
                   )}>
                     {isOut ? "Attending Status" : "Can't make it?"}
                   </p>
@@ -607,168 +808,6 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
         </div>
       )}
 
-      {/* MVP Voting Section */}
-      {nextGame.status === 'voting' && (
-        <div className="space-y-8">
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="glass-card p-8 border-2 border-blue-500/30 space-y-8"
-          >
-            <div className="text-center space-y-2">
-              <h2 className="text-3xl font-black italic tracking-tighter flex items-center justify-center gap-3 text-blue-500">
-                <VoteIcon size={32} /> WHO WAS THE BEST ON PITCH?
-              </h2>
-              <p className="text-white/40 text-sm font-bold uppercase tracking-widest">
-                Live Poll Results • Can't vote for yourself or your MSP candidate!
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[...nextGame.team_a, ...nextGame.team_b].map(player => {
-                const voteCount = getVoteCount(player.id);
-                const isVotedByMe = myVote?.candidate_id === player.id;
-                const isMe = player.id === user?.id;
-                const isMyMspChoice = myMspVote?.candidate_id === player.id;
-                const isDisabled = actionLoading || !!myVote || isMe || isMyMspChoice;
-
-                return (
-                  <button
-                    key={player.id}
-                    onClick={() => handleVote(player.id)}
-                    disabled={isDisabled}
-                    className={cn(
-                      "relative group flex items-center justify-between p-4 rounded-2xl border transition-all overflow-hidden text-left",
-                      isVotedByMe 
-                        ? "bg-white text-black border-white shadow-[0_0_20px_rgba(255,255,255,0.5)]" 
-                        : isMyMspChoice 
-                          ? "bg-white/5 border-white/5 opacity-30 cursor-not-allowed"
-                          : "bg-white/5 border-white/10 hover:border-blue-500/50 hover:bg-white/10",
-                      isDisabled && !isVotedByMe && "opacity-50 cursor-not-allowed"
-                    )}
-                  >
-                    {/* Progress Bar Background */}
-                    {votes.length > 0 && (
-                      <div 
-                        className="absolute inset-0 bg-blue-500/10 transition-all duration-1000 animate-pulse" 
-                        style={{ width: `${(voteCount / votes.length) * 100}%` }}
-                      />
-                    )}
-
-                    <div className="relative flex items-center gap-3 z-10">
-                      <div className={cn(
-                        "w-8 h-8 rounded-full flex items-center justify-center text-xs font-black",
-                        isVotedByMe ? "bg-blue-500 text-white" : "bg-white/10 text-white/40"
-                      )}>
-                        {isVotedByMe ? <Check size={16} /> : voteCount}
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="font-bold tracking-tight">{player.full_name}</span>
-                        <div className="flex gap-1.5 mt-0.5">
-                          {isMe && <span className="text-[10px] uppercase bg-white/10 px-2 py-0.5 rounded text-white/40">You</span>}
-                          {isMyMspChoice && <span className="text-[9px] uppercase bg-red-500/10 px-2   py-0.5 rounded text-red-500 font-extrabold border border-red-500/20">Your MSP choice</span>}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="relative text-xs font-black uppercase tracking-widest opacity-40 group-hover:opacity-100 transition-opacity z-10">
-                      {isVotedByMe ? "Your Vote" : `${voteCount} ${voteCount === 1 ? 'Vote' : 'Votes'}`}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-
-            {myVote && (
-              <div className="text-center">
-                <p className="text-blue-400 text-sm font-bold flex items-center justify-center gap-2">
-                  <CheckCircle2 size={16} /> You have cast your MVP vote!
-                </p>
-              </div>
-            )}
-          </motion.div>
-
-          {/* MSP Voting Section */}
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="glass-card p-8 border-2 border-red-500/30 space-y-8"
-          >
-            <div className="text-center space-y-2">
-              <h2 className="text-3xl font-black italic tracking-tighter flex items-center justify-center gap-3 text-red-500">
-                <Frown size={32} /> WHO WAS THE MOST SHITTY ON PITCH? (MSP)
-              </h2>
-              <p className="text-white/40 text-sm font-bold uppercase tracking-widest leading-relaxed">
-                Live Poll Results • Can't vote for yourself or your MVP candidate!
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[...nextGame.team_a, ...nextGame.team_b].map(player => {
-                const voteCount = getMspVoteCount(player.id);
-                const isVotedByMe = myMspVote?.candidate_id === player.id;
-                const isMe = player.id === user?.id;
-                const isMyMvpChoice = myVote?.candidate_id === player.id;
-                const isDisabled = actionLoading || !!myMspVote || isMe || isMyMvpChoice;
-
-                return (
-                  <button
-                    key={player.id}
-                    onClick={() => handleMspVote(player.id)}
-                    disabled={isDisabled}
-                    className={cn(
-                      "relative group flex items-center justify-between p-4 rounded-2xl border transition-all overflow-hidden text-left",
-                      isVotedByMe 
-                        ? "bg-white text-black border-white shadow-[0_0_20px_rgba(239,68,68,0.5)]" 
-                        : isMyMvpChoice 
-                          ? "bg-white/5 border-white/5 opacity-30 cursor-not-allowed"
-                          : "bg-white/5 border-white/10 hover:border-red-500/50 hover:bg-white/10",
-                      isDisabled && !isVotedByMe && "opacity-50 cursor-not-allowed"
-                    )}
-                  >
-                    {/* Progress Bar Background */}
-                    {mspVotes.length > 0 && (
-                      <div 
-                        className="absolute inset-0 bg-red-500/10 transition-all duration-1000 animate-pulse" 
-                        style={{ width: `${(voteCount / mspVotes.length) * 100}%` }}
-                      />
-                    )}
-
-                    <div className="relative flex items-center gap-3 z-10">
-                      <div className={cn(
-                        "w-8 h-8 rounded-full flex items-center justify-center text-xs font-black",
-                        isVotedByMe ? "bg-red-500 text-white" : "bg-white/10 text-white/40"
-                      )}>
-                        {isVotedByMe ? <Check size={16} /> : voteCount}
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="font-bold tracking-tight">{player.full_name}</span>
-                        <div className="flex gap-1.5 mt-0.5">
-                          {isMe && <span className="text-[10px] uppercase bg-white/10 px-2 py-0.5 rounded text-white/40">You</span>}
-                          {isMyMvpChoice && <span className="text-[9px] uppercase bg-blue-500/10 px-2 py-0.5 rounded text-blue-400 font-extrabold border border-blue-500/20">Your MVP choice</span>}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="relative text-xs font-black uppercase tracking-widest opacity-40 group-hover:opacity-100 transition-opacity z-10">
-                      {isVotedByMe ? "Your Vote" : `${voteCount} ${voteCount === 1 ? 'Vote' : 'Votes'}`}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-
-            {myMspVote && (
-              <div className="text-center">
-                <p className="text-red-400 text-sm font-bold flex items-center justify-center gap-2">
-                  <CheckCircle2 size={16} /> You have cast your MSP vote!
-                </p>
-              </div>
-            )}
-          </motion.div>
-        </div>
-      )}
-
       {/* Player Lists */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         <div className="space-y-4">
@@ -780,7 +819,7 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
               <div key={rsvp.id} className="glass-card p-4 flex items-center justify-between border-l-4 border-[#00ff66]">
                 <div className="flex items-center gap-4">
                   <span className="text-white/20 font-black italic w-6">{i + 1}</span>
-                  <span className="font-bold">{rsvp.profiles?.full_name}</span>
+                  <span className="font-bold">{rsvp.profiles?.full_name || `Player (${rsvp.user_id.slice(0, 5)})`}</span>
                 </div>
                 {rsvp.created_at && (
                   <span className="text-[10px] font-mono text-white/40 tracking-wider font-semibold">
@@ -801,7 +840,7 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
               <div key={rsvp.id} className="glass-card p-4 flex items-center justify-between opacity-60 border-l-4 border-yellow-500">
                 <div className="flex items-center gap-4">
                   <span className="text-white/20 font-black italic w-6">{i + 1}</span>
-                  <span className="font-bold">{rsvp.profiles?.full_name}</span>
+                  <span className="font-bold">{rsvp.profiles?.full_name || `Player (${rsvp.user_id.slice(0, 5)})`}</span>
                 </div>
                 {rsvp.created_at && (
                   <span className="text-[10px] font-mono text-white/30 tracking-wider font-semibold">
@@ -813,7 +852,7 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
           </div>
         </div>
 
-        <div className="space-y-4">
+         <div className="space-y-4">
           <h3 className="text-xl font-black italic flex items-center gap-2 text-white/40">
             <X className="text-highlight" /> OUT ({declined.length})
           </h3>
@@ -822,11 +861,11 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
               <div key={rsvp.id} className="glass-card p-4 flex items-center justify-between opacity-40 border-l-4 border-highlight">
                 <div className="flex items-center gap-4">
                   <span className="text-white/20 font-black italic w-6">{i + 1}</span>
-                  <span className="font-bold">{rsvp.profiles?.full_name}</span>
+                  <span className="font-bold">{rsvp.profiles?.full_name || `Player (${rsvp.user_id.slice(0, 5)})`}</span>
                 </div>
                 {rsvp.created_at && (
                   <span className="text-[10px] font-mono text-white/20 tracking-wider font-semibold">
-                    {formatRsvpTime(rsvp.created_at)}
+                     {formatRsvpTime(rsvp.created_at)}
                   </span>
                 )}
               </div>
