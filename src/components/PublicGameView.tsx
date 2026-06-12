@@ -820,7 +820,7 @@ const confirmed = rsvps.filter(r => r.status === 'confirmed');
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* MVP Section */}
                 <div className="space-y-6">
-                  <div className="flex items-center justify-between border-b border-blue-500/20 pb-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between items-start gap-1 sm:gap-4 border-b border-blue-500/20 pb-4">
                     <h3 className="text-2xl font-black italic tracking-tighter flex items-center gap-3 text-blue-500">
                       <BarChart3 /> 
                       {game.status === 'finished' ? 'FINAL MVP RESULTS' : 'LIVE MVP VOTING'}
@@ -905,7 +905,7 @@ const confirmed = rsvps.filter(r => r.status === 'confirmed');
 
                 {/* MSP Section */}
                 <div className="space-y-6">
-                  <div className="flex items-center justify-between border-b border-red-500/20 pb-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between items-start gap-1 sm:gap-4 border-b border-red-500/20 pb-4">
                     <h3 className="text-2xl font-black italic tracking-tighter flex items-center gap-3 text-red-500">
                       <Frown /> 
                       {game.status === 'finished' ? 'FINAL MSP RESULTS' : 'LIVE MSP VOTING'}
