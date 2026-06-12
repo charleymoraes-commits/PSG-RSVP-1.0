@@ -149,13 +149,13 @@ export default function HistoryView({ user }: HistoryViewProps) {
                   <MapPin size={16} className="text-white group-hover:text-pitch transition-colors" /> 
                   <h2 className="text-2xl font-bold group-hover:text-pitch transition-colors">{game.location}</h2>
                 </a>
-                <div className="flex flex-wrap items-center gap-4 text-sm text-white/40">
-                  <div className="flex items-center gap-1"><Users size={16} /> {(game.team_a?.length || 0) + (game.team_b?.length || 0)} Players</div>
+                <div className="flex flex-col gap-2 mt-2">
+                  <div className="flex items-center gap-1.5 text-sm text-white/40"><Users size={16} /> {(game.team_a?.length || 0) + (game.team_b?.length || 0)} Players</div>
                   {game.mvp_winner && (
-                    <div className="flex items-center gap-1.5 text-blue-400 font-bold"><Trophy size={16} className="text-yellow-500" /> MVP: {game.mvp_winner}</div>
+                    <div className="flex items-center gap-1.5 text-blue-400 font-bold text-sm"><Trophy size={16} className="text-yellow-500" /> MVP: {game.mvp_winner}</div>
                   )}
                   {game.msp_winner && (
-                    <div className="flex items-center gap-1.5 text-red-400 font-bold"><Frown size={16} className="text-red-500" /> MSP: {game.msp_winner}</div>
+                    <div className="flex items-center gap-1.5 text-red-400 font-bold text-sm"><Frown size={16} className="text-red-500" /> MSP: {game.msp_winner}</div>
                   )}
                 </div>
               </div>

@@ -690,37 +690,24 @@ export default function AdminView() {
         <div className="space-y-4">
           {historyGames.map(game => (
             <div key={game.id} className="glass-card p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 opacity-60 hover:opacity-100 transition-opacity">
-              <div className="space-y-1">
+              <div className="space-y-2">
                 <div className="font-black text-xl tracking-tight">{game.date}</div>
                 <div className="text-sm text-white/40 font-bold uppercase tracking-widest">
-                  {game.location} • MVP: {game.mvp_winner || 'N/A'} • MSP: {game.msp_winner || 'N/A'}
+                  {game.location}
+                </div>
+                <div className="flex flex-col gap-1.5 mt-2 text-xs font-bold uppercase tracking-wider">
+                  <div className="text-blue-400 flex items-center gap-2">
+                    <Trophy size={14} className="text-yellow-500" />
+                    <span>MVP: {game.mvp_winner || 'N/A'}</span>
+                  </div>
+                  <div className="text-red-400 flex items-center gap-2">
+                    <Frown size={14} className="text-red-500" />
+                    <span>MSP: {game.msp_winner || 'N/A'}</span>
+                  </div>
                 </div>
               </div>
               
               <div className="flex flex-wrap items-center gap-3">
-                <button 
-                  onClick={() => {
-                    if (window.confirm('Do you want to reopen this match for MVP & MSP Voting?')) {
-                      updateGameStatus(game.id, 'voting');
-                    }
-                  }}
-                  className="bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all flex items-center gap-1.5"
-                  title="Reopen match and allow players to vote again"
-                >
-                  <RotateCw size={12} /> Reopen Voting
-                </button>
-                <button 
-                  onClick={() => {
-                    if (window.confirm('Do you want to move this match back to RSVP Open?')) {
-                      updateGameStatus(game.id, 'open');
-                    }
-                  }}
-                  className="bg-white/5 text-white/60 hover:bg-white/10 px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all flex items-center gap-1.5"
-                  title="Set match status back to RSVP Open"
-                >
-                  <RotateCw size={12} /> RSVP Open
-                </button>
-
                 {deletingGameId === game.id ? (
                   <div className="flex items-center gap-2 bg-red-500/10 p-2 rounded-xl border border-red-500/20">
                     <span className="text-[10px] font-bold text-red-500 uppercase">Delete history?</span>

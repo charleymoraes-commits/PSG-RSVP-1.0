@@ -565,32 +565,48 @@ const confirmed = rsvps.filter(r => r.status === 'confirmed');
           {/* Winner Display Cards */}
           {(game.mvp_winner || game.msp_winner) && (
             <div className="flex flex-col md:flex-row lg:flex-col gap-4 w-full">
-              {game.mvp_winner && (
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="bg-white text-black p-6 rounded-3xl flex flex-col items-center text-center space-y-2 shadow-[0_0_50px_rgba(255,255,255,0.2)] flex-1"
-                >
-                  <Trophy size={36} className="text-blue-600 animate-bounce" />
-                  <div className="space-y-1">
-                    <p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-50">Match MVP</p>
-                    <h2 className="text-2xl font-black italic tracking-tighter">{game.mvp_winner.toUpperCase()}</h2>
-                  </div>
-                </motion.div>
-              )}
-              {game.msp_winner && (
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="bg-red-500/15 text-red-500 p-6 rounded-3xl flex flex-col items-center text-center space-y-2 border border-red-500/30 shadow-[0_0_50px_rgba(239,68,68,0.1)] flex-1"
-                >
-                  <Frown size={36} className="text-red-500 animate-pulse" />
-                  <div className="space-y-1">
-                    <p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-50 text-red-400">Match MSP</p>
-                    <h2 className="text-2xl font-black italic tracking-tighter text-white">{game.msp_winner.toUpperCase()}</h2>
-                  </div>
-                </motion.div>
-              )}
+              {game.mvp_winner && (() => {
+                const mvpWinnerPlayer = confirmed.find(p => p.profiles?.full_name?.toLowerCase() === game.mvp_winner?.toLowerCase());
+                const mvpWinnerUserId = mvpWinnerPlayer?.user_id || mvpWinners[0]?.user_id || '';
+                const mvpPhrase = getStablePhrase(MVP_PHRASES, mvpWinnerUserId, game.id);
+                return (
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="bg-white text-black p-6 rounded-3xl flex flex-col items-center text-center space-y-2 shadow-[0_0_50px_rgba(255,255,255,0.2)] flex-1"
+                  >
+                    <Trophy size={36} className="text-blue-600 animate-bounce" />
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-50">Player of the Match</p>
+                      <h2 className="text-2xl font-black italic tracking-tighter">{game.mvp_winner.toUpperCase()}</h2>
+                      <p className="text-xs font-bold text-black/75 leading-relaxed italic max-w-xs pt-1">
+                        "{mvpPhrase}"
+                      </p>
+                    </div>
+                  </motion.div>
+                );
+              })()}
+              {game.msp_winner && (() => {
+                const mspWinnerPlayer = confirmed.find(p => p.profiles?.full_name?.toLowerCase() === game.msp_winner?.toLowerCase());
+                const mspWinnerUserId = mspWinnerPlayer?.user_id || mspWinners[0]?.user_id || '';
+                const mspPhrase = getStablePhrase(MSP_PHRASES, mspWinnerUserId, game.id);
+                return (
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="bg-red-500/15 text-red-500 p-6 rounded-3xl flex flex-col items-center text-center space-y-2 border border-red-500/30 shadow-[0_0_50px_rgba(239,68,68,0.1)] flex-1"
+                  >
+                    <Frown size={36} className="text-red-500 animate-pulse" />
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40 text-red-400">Most shitty Player</p>
+                      <h2 className="text-2xl font-black italic tracking-tighter text-white">{game.msp_winner.toUpperCase()}</h2>
+                      <p className="text-xs font-bold text-white/80 leading-relaxed italic max-w-xs pt-1">
+                        "{mspPhrase}"
+                      </p>
+                    </div>
+                  </motion.div>
+                );
+              })()}
             </div>
           )}
         </div>
@@ -815,20 +831,17 @@ const confirmed = rsvps.filter(r => r.status === 'confirmed');
                   </div>
 
                   {/* If finished: display a beautiful MVP winner banner */}
-                  {game.status === 'finished' && mvpWinners.length > 0 && (
+                  {game.status === 'finished' && mvpWinners.length > 1 && (
                     <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-5 mb-4 relative overflow-hidden">
                       <div className="absolute top-2 right-2 opacity-10 text-blue-500">
                         <Trophy size={80} />
                       </div>
                       <p className="text-xs uppercase font-black tracking-widest text-blue-400 mb-1 flex items-center gap-1.5">
-                        🏆 MVP: MOST VALUABLE PLAYER
+                        🏆 MVP: MOST VALUABLE PLAYER DRAW
                       </p>
                       <h4 className="text-xl font-black italic tracking-tight text-white uppercase flex items-center gap-2">
                         {mvpWinners.map(w => w.profiles?.full_name || 'Unknown Player').join(' & ')}
                       </h4>
-                      <p className="text-xs font-bold mt-2 text-white/80 leading-relaxed max-w-md">
-                        {getStablePhrase(MVP_PHRASES, mvpWinners[0]?.user_id || '', game.id)}
-                      </p>
                     </div>
                   )}
 
@@ -903,20 +916,17 @@ const confirmed = rsvps.filter(r => r.status === 'confirmed');
                   </div>
 
                   {/* If finished: display a beautiful MSP winner banner */}
-                  {game.status === 'finished' && mspWinners.length > 0 && (
+                  {game.status === 'finished' && mspWinners.length > 1 && (
                     <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-5 mb-4 relative overflow-hidden">
                       <div className="absolute top-2 right-2 opacity-10 text-red-500">
                         <Frown size={80} />
                       </div>
                       <p className="text-xs uppercase font-black tracking-widest text-red-400 mb-1 flex items-center gap-1.5">
-                        🚽 MSP: MOST SHITTY PLAYER
+                        🚽 MSP: MOST SHITTY PLAYER DRAW
                       </p>
                       <h4 className="text-xl font-black italic tracking-tight text-white uppercase flex items-center gap-2">
                         {mspWinners.map(w => w.profiles?.full_name || 'Unknown Player').join(' & ')}
                       </h4>
-                      <p className="text-xs font-bold mt-2 text-white/80 leading-relaxed max-w-md">
-                        {getStablePhrase(MSP_PHRASES, mspWinners[0]?.user_id || '', game.id)}
-                      </p>
                     </div>
                   )}
 
