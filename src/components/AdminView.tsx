@@ -192,9 +192,9 @@ export default function AdminView() {
 
   const drawTeams = async (gameId: string) => {
     try {
-      const { data: rsvps, error: fetchErr } = await supabase
+      const { data: rsvpsData, error: fetchErr } = await supabase
         .from('rsvps')
-        .select('*, profiles(*)')
+        .select('*')
         .eq('game_id', gameId)
         .eq('status', 'confirmed');
 
@@ -203,12 +203,27 @@ export default function AdminView() {
         return;
       }
 
-      if (!rsvps || rsvps.length < 2) {
+      if (!rsvpsData || rsvpsData.length < 2) {
         showStatus('error', 'Not enough players to draw teams (minimum 2 players confirmed).');
         return;
       }
 
-      const playing = rsvps.map(r => r.profiles).filter(Boolean) as Profile[];
+      const userIds = rsvpsData.map(r => r.user_id);
+      const { data: profilesData, error: profilesErr } = await supabase
+        .from('profiles')
+        .select('*')
+        .in('id', userIds);
+
+      if (profilesErr) {
+        showStatus('error', 'Error fetching profiles for RSVPs: ' + profilesErr.message);
+        return;
+      }
+
+      const profilesMap = new Map((profilesData || []).map(p => [p.id, p]));
+      const playing = rsvpsData
+        .map(r => profilesMap.get(r.user_id))
+        .filter(Boolean) as any[];
+
       const shuffled = [...playing].sort(() => Math.random() - 0.5);
       const mid = Math.ceil(shuffled.length / 2);
       const teamA = shuffled.slice(0, mid);
@@ -260,6 +275,18 @@ export default function AdminView() {
               const winner = profiles.find(p => p.id === winnerId);
               if (winner) {
                 updateData.mvp_winner = winner.full_name;
+              } else {
+                // Direct database fallback lookup
+                const { data: pData } = await supabase
+                  .from('profiles')
+                  .select('full_name')
+                  .eq('id', winnerId)
+                  .single();
+                if (pData) {
+                  updateData.mvp_winner = pData.full_name;
+                } else {
+                  updateData.mvp_winner = `Player (${winnerId.slice(0, 5)})`;
+                }
               }
             }
           }
@@ -291,6 +318,18 @@ export default function AdminView() {
               const mspWinner = profiles.find(p => p.id === mspWinnerId);
               if (mspWinner) {
                 updateData.msp_winner = mspWinner.full_name;
+              } else {
+                // Direct database fallback lookup
+                const { data: pData } = await supabase
+                  .from('profiles')
+                  .select('full_name')
+                  .eq('id', mspWinnerId)
+                  .single();
+                if (pData) {
+                  updateData.msp_winner = pData.full_name;
+                } else {
+                  updateData.msp_winner = `Player (${mspWinnerId.slice(0, 5)})`;
+                }
               }
             }
           }
@@ -543,6 +582,12 @@ export default function AdminView() {
                     >
                       <X size={14} /> Close RSVP
                     </button>
+                    <button 
+                      onClick={() => updateGameStatus(game.id, 'finished')} 
+                      className="bg-highlight/10 text-highlight px-4 py-2 rounded-xl text-xs font-bold hover:bg-highlight/20 transition-all flex items-center gap-2"
+                    >
+                      <Check size={14} /> Finish Match
+                    </button>
                   </>
                 )}
 
@@ -559,6 +604,12 @@ export default function AdminView() {
                       className="bg-pitch text-black px-4 py-2 rounded-xl text-xs font-bold hover:bg-pitch-dark transition-all flex items-center gap-2"
                     >
                       <Trophy size={14} /> End game and start MVP Poll
+                    </button>
+                    <button 
+                      onClick={() => updateGameStatus(game.id, 'finished')} 
+                      className="bg-highlight/10 text-highlight px-4 py-2 rounded-xl text-xs font-bold hover:bg-highlight/20 transition-all flex items-center gap-2"
+                    >
+                      <Check size={14} /> Finish Match
                     </button>
                   </>
                 )}

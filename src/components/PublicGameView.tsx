@@ -71,12 +71,39 @@ export default function PublicGameView({ gameId }: PublicGameViewProps) {
   const fetchRSVPs = async () => {
     const { data, error } = await supabase
       .from('rsvps')
-      .select('*, profiles!user_id(*)')
+      .select('*')
       .eq('game_id', gameId)
       .order('created_at', { ascending: true });
 
-    if (error) console.error('Error fetching RSVPs:', error);
-    if (data) setRsvps(data as any);
+    if (error) {
+      console.error('Error fetching RSVPs:', error);
+      return;
+    }
+
+    if (data) {
+      const userIds = data.map(r => r.user_id);
+      if (userIds.length > 0) {
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select('*')
+          .in('id', userIds);
+
+        if (profilesError) {
+          console.error('Error fetching profiles for RSVPs:', profilesError);
+          const merged = data.map(r => ({ ...r, profiles: null }));
+          setRsvps(merged as any);
+        } else {
+          const profilesMap = new Map(profilesData?.map(p => [p.id, p]) || []);
+          const merged = data.map(r => ({
+            ...r,
+            profiles: profilesMap.get(r.user_id) || null
+          }));
+          setRsvps(merged as any);
+        }
+      } else {
+        setRsvps([]);
+      }
+    }
   };
 
   const fetchVotes = async () => {
@@ -140,7 +167,7 @@ export default function PublicGameView({ gameId }: PublicGameViewProps) {
       // Fetch fresh data to avoid stale state issues
       const { data: currentRSVPs, error: fetchError } = await supabase
         .from('rsvps')
-        .select('*, profiles(*)')
+        .select('*')
         .eq('game_id', gameId)
         .order('created_at', { ascending: true });
 

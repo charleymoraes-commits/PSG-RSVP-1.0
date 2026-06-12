@@ -81,12 +81,39 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
     if (!nextGame) return;
     const { data, error } = await supabase
       .from('rsvps')
-      .select('*, profiles(*)')
+      .select('*')
       .eq('game_id', nextGame.id)
       .order('created_at', { ascending: true });
 
-    if (error) console.error('Error fetching RSVPs:', error);
-    if (data) setRsvps(data);
+    if (error) {
+      console.error('Error fetching RSVPs:', error);
+      return;
+    }
+
+    if (data) {
+      const userIds = data.map(r => r.user_id);
+      if (userIds.length > 0) {
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select('*')
+          .in('id', userIds);
+
+        if (profilesError) {
+          console.error('Error fetching profiles for RSVPs:', profilesError);
+          const merged = data.map(r => ({ ...r, profiles: null }));
+          setRsvps(merged as any);
+        } else {
+          const profilesMap = new Map(profilesData?.map(p => [p.id, p]) || []);
+          const merged = data.map(r => ({
+            ...r,
+            profiles: profilesMap.get(r.user_id) || null
+          }));
+          setRsvps(merged as any);
+        }
+      } else {
+        setRsvps([]);
+      }
+    }
   };
 
   const fetchVotes = async () => {
@@ -135,7 +162,7 @@ export default function MatchView({ user, profile, onGoToAdmin }: MatchViewProps
       // Fetch fresh data to avoid stale state issues
       const { data: currentRSVPs, error: fetchError } = await supabase
         .from('rsvps')
-        .select('*, profiles(*)')
+        .select('*')
         .eq('game_id', nextGame.id)
         .order('created_at', { ascending: true });
 
