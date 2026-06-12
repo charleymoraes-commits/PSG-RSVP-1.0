@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Game, Profile } from '../types';
 import { motion } from 'motion/react';
-import { Plus, Users, Shield, Trash2, Check, X, Copy, Flag, Share2, Trophy, Loader2 } from 'lucide-react';
+import { Plus, Users, Shield, Trash2, Check, X, Copy, Flag, Share2, Trophy, Loader2, RotateCw, Frown } from 'lucide-react';
 import { cn, formatDate, formatTime } from '../lib/utils';
 
 export default function AdminView() {
@@ -373,6 +373,18 @@ export default function AdminView() {
     }
   };
 
+  const copyMSPPoll = (game: Game) => {
+    try {
+      const appUrl = window.location.origin;
+      const pollText = `💩 *MSP VOTING (Most Shitty Player): ${game.date}*\n\nVote for the MSP of the match here:\n${appUrl}\n\n_Only confirmed players can vote!_`;
+      
+      navigator.clipboard.writeText(pollText);
+      showStatus('success', 'MSP voting WhatsApp poll template copied to clipboard!');
+    } catch (err: any) {
+      showStatus('error', 'Error copying MSP poll template: ' + (err.message || err));
+    }
+  };
+
   const deleteGame = async (gameId: string) => {
     try {
       const { error } = await supabase.from('games').delete().eq('id', gameId);
@@ -583,7 +595,11 @@ export default function AdminView() {
                       <X size={14} /> Close RSVP
                     </button>
                     <button 
-                      onClick={() => updateGameStatus(game.id, 'finished')} 
+                      onClick={() => {
+                        if (window.confirm('Are you sure you want to finish this match directly? This will end the game immediately and skip the MVP & MSP voting phase.')) {
+                          updateGameStatus(game.id, 'finished');
+                        }
+                      }} 
                       className="bg-highlight/10 text-highlight px-4 py-2 rounded-xl text-xs font-bold hover:bg-highlight/20 transition-all flex items-center gap-2"
                     >
                       <Check size={14} /> Finish Match
@@ -603,10 +619,14 @@ export default function AdminView() {
                       onClick={() => updateGameStatus(game.id, 'voting')} 
                       className="bg-pitch text-black px-4 py-2 rounded-xl text-xs font-bold hover:bg-pitch-dark transition-all flex items-center gap-2"
                     >
-                      <Trophy size={14} /> End game and start MVP Poll
+                      <Trophy size={14} /> Start MVP & MSP Voting
                     </button>
                     <button 
-                      onClick={() => updateGameStatus(game.id, 'finished')} 
+                      onClick={() => {
+                        if (window.confirm('Are you sure you want to finish this match directly? This will end the game immediately and skip the MVP & MSP voting phase.')) {
+                          updateGameStatus(game.id, 'finished');
+                        }
+                      }} 
                       className="bg-highlight/10 text-highlight px-4 py-2 rounded-xl text-xs font-bold hover:bg-highlight/20 transition-all flex items-center gap-2"
                     >
                       <Check size={14} /> Finish Match
@@ -620,7 +640,13 @@ export default function AdminView() {
                       onClick={() => copyMVPPoll(game)} 
                       className="bg-blue-500/10 text-blue-500 px-4 py-2 rounded-xl text-xs font-bold hover:bg-blue-500/20 transition-all flex items-center gap-2"
                     >
-                      <Copy size={14} /> Copy WhatsApp Poll
+                      <Trophy size={14} /> Copy MVP Poll
+                    </button>
+                    <button 
+                      onClick={() => copyMSPPoll(game)} 
+                      className="bg-red-500/10 text-red-500 px-4 py-2 rounded-xl text-xs font-bold hover:bg-red-500/20 transition-all flex items-center gap-2"
+                    >
+                      <Frown size={14} /> Copy MSP Poll
                     </button>
                     <button 
                       onClick={() => updateGameStatus(game.id, 'finished')} 
@@ -677,7 +703,30 @@ export default function AdminView() {
                 </div>
               </div>
               
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <button 
+                  onClick={() => {
+                    if (window.confirm('Do you want to reopen this match for MVP & MSP Voting?')) {
+                      updateGameStatus(game.id, 'voting');
+                    }
+                  }}
+                  className="bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all flex items-center gap-1.5"
+                  title="Reopen match and allow players to vote again"
+                >
+                  <RotateCw size={12} /> Reopen Voting
+                </button>
+                <button 
+                  onClick={() => {
+                    if (window.confirm('Do you want to move this match back to RSVP Open?')) {
+                      updateGameStatus(game.id, 'open');
+                    }
+                  }}
+                  className="bg-white/5 text-white/60 hover:bg-white/10 px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all flex items-center gap-1.5"
+                  title="Set match status back to RSVP Open"
+                >
+                  <RotateCw size={12} /> RSVP Open
+                </button>
+
                 {deletingGameId === game.id ? (
                   <div className="flex items-center gap-2 bg-red-500/10 p-2 rounded-xl border border-red-500/20">
                     <span className="text-[10px] font-bold text-red-500 uppercase">Delete history?</span>

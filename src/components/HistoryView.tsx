@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Game, Profile, Vote } from '../types';
 import { motion } from 'motion/react';
-import { Trophy, Calendar, Users, Award, MapPin, X } from 'lucide-react';
+import { Trophy, Calendar, Users, Award, MapPin, X, Frown } from 'lucide-react';
 import { formatDate } from '../lib/utils';
 
 interface HistoryViewProps {
@@ -149,10 +149,13 @@ export default function HistoryView({ user }: HistoryViewProps) {
                   <MapPin size={16} className="text-white group-hover:text-pitch transition-colors" /> 
                   <h2 className="text-2xl font-bold group-hover:text-pitch transition-colors">{game.location}</h2>
                 </a>
-                <div className="flex items-center gap-4 text-sm text-white/40">
+                <div className="flex flex-wrap items-center gap-4 text-sm text-white/40">
                   <div className="flex items-center gap-1"><Users size={16} /> {(game.team_a?.length || 0) + (game.team_b?.length || 0)} Players</div>
                   {game.mvp_winner && (
-                    <div className="flex items-center gap-1 text-white"><Trophy size={16} /> MVP: {game.mvp_winner}</div>
+                    <div className="flex items-center gap-1.5 text-blue-400 font-bold"><Trophy size={16} className="text-yellow-500" /> MVP: {game.mvp_winner}</div>
+                  )}
+                  {game.msp_winner && (
+                    <div className="flex items-center gap-1.5 text-red-400 font-bold"><Frown size={16} className="text-red-500" /> MSP: {game.msp_winner}</div>
                   )}
                 </div>
               </div>
