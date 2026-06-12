@@ -643,12 +643,6 @@ export default function AdminView() {
                       <Trophy size={14} /> Copy MVP Poll
                     </button>
                     <button 
-                      onClick={() => copyMSPPoll(game)} 
-                      className="bg-red-500/10 text-red-500 px-4 py-2 rounded-xl text-xs font-bold hover:bg-red-500/20 transition-all flex items-center gap-2"
-                    >
-                      <Frown size={14} /> Copy MSP Poll
-                    </button>
-                    <button 
                       onClick={() => updateGameStatus(game.id, 'finished')} 
                       className="bg-highlight text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-red-600 transition-all flex items-center gap-2 shadow-[0_0_15px_rgba(255,59,48,0.3)]"
                     >
